@@ -160,6 +160,18 @@ def mask_for_query(df, q: str):
 
 def mask_for_item_query(df, q: str):
     """Match exact category aliases by sheet, otherwise match item names."""
+    normalized = _normalize_search_text(q)
+    cloak_codes = {'신이속':{1102101,1102104},'신점프':{1102102,1102105},'신회피':{1102103,1102106},'신망토':set(range(1102101,1102107))}
+    if normalized in cloak_codes:
+        return pd.to_numeric(df['itemCode'], errors='coerce').isin(cloak_codes[normalized])
+    if normalized == '단도':
+        return df['sheet'].eq('단검') & pd.to_numeric(df.get('힘',pd.Series(0,index=df.index)),errors='coerce').fillna(0).ne(0)
+    match = re.fullmatch(r'(전사|법사|궁수|도적|나로|섀도어|해적)(신발|장갑|전신|상의|하의|모자|방패)',normalized)
+    if match:
+        job, part = match.groups()
+        jobs = ['도적','나로','섀도어'] if job in {'도적','나로','섀도어'} else [job]
+        job_values = df.get('직업', pd.Series('', index=df.index)).fillna('').astype(str)
+        return df['sheet'].eq(part) & job_values.map(lambda value: bool(set(re.split(r'[,/·\s]+', value)) & set(jobs)))
     category_sheet = category_sheet_for_query(q)
     if category_sheet and df is not None and "sheet" in df.columns:
         return df["sheet"].astype(str).str.strip().eq(category_sheet)
