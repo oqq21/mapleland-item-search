@@ -19,7 +19,7 @@ from your_app.gui.search_table import render_table
 from your_app.gui.compact_layout import COMPACT_CSS
 
 ROOT=Path(__file__).resolve().parent
-APP_BUILD="2026-11-10-search-v8"
+APP_BUILD="2026-11-10-search-v9"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="expanded")
 st.html(COMPACT_CSS)
 
@@ -138,9 +138,9 @@ with st.container(key='workspace',gap='xxsmall'):
     with search_area.container(key='search_fields',gap='xxsmall'):
         st.text_input('이름',key='query',placeholder='아이템명 / 도적신발 / 신망토',on_change=request_search)
         fields=st.columns([1,1,1,.75],vertical_alignment='bottom',wrap=False)
-        fields[0].text_input('스탯1',key='stat1',placeholder='공116',on_change=request_search)
-        fields[1].text_input('스탯2',key='stat2',placeholder='덱4~5',on_change=request_search)
-        fields[2].text_input('스탯3',key='stat3',placeholder='업0',on_change=request_search)
+        fields[0].text_input('스탯1',key='stat1',on_change=request_search)
+        fields[1].text_input('스탯2',key='stat2',on_change=request_search)
+        fields[2].text_input('스탯3',key='stat3',on_change=request_search)
         fields[3].button('검색',type='primary',width='stretch',on_click=request_search)
     with filter_area.container(key='filter_fields',gap='xxsmall'):
         trade=st.columns([.5,4],vertical_alignment='center',wrap=False)
