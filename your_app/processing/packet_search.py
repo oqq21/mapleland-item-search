@@ -226,7 +226,7 @@ def format_sale_duration(row):
     if str(row.get('status',''))!='completed':return ''
     if pd.isna(n):return '미확인'
     n=number(n)
-    return f'{n}초' if n<60 else f'{n//60}분' if n<3600 else f'{n//3600}시간' if n<86400 else f'{n//86400}일'
+    return f'{n}초' if n<=100 else f'{max(2,n//60)}분' if n<3600 else f'{n//3600}시간' if n<86400 else f'{n//86400}일'
 
 def packet_view(frame,include_gems=False,prices=None,context=''):
     if frame.empty:return pd.DataFrame()

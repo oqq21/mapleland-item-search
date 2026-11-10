@@ -134,6 +134,12 @@ def test_fast_sale_boundary_and_completed_red_priority():
     assert html.count('<tr class="fast">')==2 and html.count('<tr class="completed">')==2
 
 
+@pytest.mark.parametrize('seconds,display',[(59,'59초'),(60,'60초'),(100,'100초'),(101,'2분'),(120,'2분'),(179,'2분'),(180,'3분'),(3599,'59분'),(3600,'1시간')])
+def test_sale_duration_shows_seconds_through_one_hundred(seconds,display):
+    from your_app.processing.packet_search import format_sale_duration
+    assert format_sale_duration(row(status='completed',_sale_duration_seconds=seconds))==display
+
+
 def test_expired_listing_not_treated_as_completed():
     view=packet_view(pd.DataFrame([row(_expiry_at=pd.Timestamp('2020-01-01'))]))
     assert view.iloc[0]['상태']=='만료'
