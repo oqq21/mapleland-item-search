@@ -19,7 +19,7 @@ from your_app.gui.search_table import render_table
 from your_app.gui.compact_layout import COMPACT_CSS
 
 ROOT=Path(__file__).resolve().parent
-APP_BUILD="2026-11-10-search-v4"
+APP_BUILD="2026-11-10-search-v5"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="collapsed")
 st.html(COMPACT_CSS)
 
@@ -75,7 +75,7 @@ if st.session_state.request_search:
         started=time.perf_counter()
         with search_feedback.container():
             with st.spinner('조건에 맞는 매물을 찾는 중…'):
-                rows,duplicates=run_search(str(snapshot.directory.resolve()),snapshot.version,codes,tuple(tokens),st.session_state.packet_include_gems)
+                rows,duplicates=run_search(str(snapshot.directory.resolve()),f'{snapshot.version}:{APP_BUILD}',codes,tuple(tokens),st.session_state.packet_include_gems)
         st.session_state.rows=rows;st.session_state.duplicates=duplicates
         st.session_state.matched=matched;st.session_state.applied_query=query;st.session_state.applied_tokens=tokens
         st.session_state.elapsed=time.perf_counter()-started

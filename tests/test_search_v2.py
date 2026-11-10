@@ -98,7 +98,7 @@ def test_search_display_total_stats_gems_separate_and_hidden_stats_count():
     assert '덱10' in f.iloc[0]['총스탯'] and '덱13' not in f.iloc[0]['총스탯']
     assert '[' not in f.iloc[0]['총스탯'] and '#8A4B08' in f.iloc[0]['_보석HTML']
 
-def test_time_crosses_midnight_and_keeps_uncertain_one_day_unknown():
+def test_time_crosses_midnight_with_both_one_and_three_day_listings():
     a=pd.DataFrame([row(captured_at='2026-11-09 23:59:45',internal_time='2026-11-12 23:59:40')])
     c=pd.DataFrame([row(status='completed',captured_at='2026-11-10 00:00:25',internal_time='2026-11-10 00:00:20')])
     _,linked,count=deduplicate_active_completed(a,c)
@@ -106,8 +106,8 @@ def test_time_crosses_midnight_and_keeps_uncertain_one_day_unknown():
     assert packet_view(linked).iloc[0]['_빠른판매']
     a.loc[0,'internal_time']='2026-11-10 23:59:40'
     _,linked,_=deduplicate_active_completed(a,c)
-    assert pd.isna(linked.iloc[0]['_sale_duration_seconds'])
-    assert not packet_view(linked).iloc[0]['_빠른판매']
+    assert linked.iloc[0]['_sale_duration_seconds']==40
+    assert packet_view(linked).iloc[0]['_빠른판매']
 
 def test_multiple_identical_active_listings_do_not_produce_fast_sale():
     a=pd.DataFrame([row(),row(captured_at='2026-11-10 10:00:06')])

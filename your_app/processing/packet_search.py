@@ -111,15 +111,19 @@ def add_packet_times(frame):
     work['_sale_at']=anchor.where(near & work.status.eq('completed'))
     work['_registered_at']=pd.NaT;work['_time_reason']='등록기간 미확인'
     work.loc[work.status.eq('completed'),'_time_reason']='연결할 판매중 자료 없음'
-    # Around one day could be a newly found old 3-day listing. Keep it unknown.
-    known3=(internal-cap).between(pd.Timedelta(days=2),pd.Timedelta(days=3))
-    reg=internal-pd.Timedelta(days=3)
-    valid3=known3 & (cap-reg).between(pd.Timedelta(0),pd.Timedelta(minutes=10)) & work.status.eq('active')
-    work.loc[valid3,'_registered_at']=reg[valid3]
+    # Real-time capture: infer either listing period when its reconstructed
+    # registration is within one hour before or after the capture, inclusive.
+    reg1=internal-pd.Timedelta(days=1);reg3=internal-pd.Timedelta(days=3)
+    active=work.status.eq('active');tolerance=pd.Timedelta(hours=1)
+    match1=active & (cap-reg1).abs().le(tolerance)
+    match3=active & (cap-reg3).abs().le(tolerance)
     if 'listing_days' in work:
-        period=pd.to_numeric(work.listing_days,errors='coerce');explicit=internal-pd.to_timedelta(period,unit='D')
-        good=period.isin([1,3]) & (cap-explicit).between(pd.Timedelta(0),pd.Timedelta(minutes=10)) & work.status.eq('active')
-        work.loc[good,'_registered_at']=explicit[good]
+        period=pd.to_numeric(work.listing_days,errors='coerce')
+        match1 &= period.isna() | period.eq(1)
+        match3 &= period.isna() | period.eq(3)
+    unique=match1 ^ match3
+    work.loc[unique & match1,'_registered_at']=reg1[unique & match1]
+    work.loc[unique & match3,'_registered_at']=reg3[unique & match3]
     work.loc[work['_registered_at'].notna(),'_time_reason']=''
     work.loc[work.status.eq('completed') & work['_sale_at'].isna(),'_time_reason']='완료 시각 미확인'
     return work
