@@ -21,6 +21,8 @@ def test_search_history_pagination_and_no_market_api(tmp_path,monkeypatch):
     monkeypatch.setattr(requests,'get',no_network)
     app=AppTest.from_file(str(root/'streamlit_app.py'),default_timeout=30).run()
     assert not app.exception
+    assert not app.sidebar.button and not app.title
+    assert all(field.proto.label_visibility.value==2 for field in app.text_input)
     assert all('판매 API' not in b.label and '구매 API' not in b.label for b in app.button)
     def search(value):
         app.text_input(key='query').set_value(item['itemName'])
@@ -37,3 +39,36 @@ def test_search_history_pagination_and_no_market_api(tmp_path,monkeypatch):
     assert app.session_state['page']==1 and len(app.session_state['rows'])==105
     search('공>116')
     assert app.error and not app.exception
+
+
+def test_gem_toggle_and_both_filters_in_real_entrypoint(tmp_path,monkeypatch):
+    import your_app.common.remote_data as remote
+    root=Path(__file__).resolve().parents[1]
+    catalog=json.loads((root/'resources/item_catalog.json').read_text(encoding='utf-8'))
+    item=next(r for r in catalog if '네쉐르' in r['itemName'])
+    code=item['itemCode']
+    pd.DataFrame([
+        row(itemCode=code,sheet='활',total_PAD=116,quantity=1),
+        row(itemCode=code,sheet='활',total_PAD=113,gem_PAD=3,option_codes='26000,26011,26008',quantity=2),
+    ]).to_parquet(tmp_path/'packet_active.parquet')
+    pd.DataFrame([row(itemCode=code,sheet='활',total_PAD=116,status='completed',quantity=3)]).to_parquet(tmp_path/'packet_completed.parquet')
+    (tmp_path/'gem_prices.json').write_text('{}',encoding='utf-8')
+    monkeypatch.setattr(remote,'ensure_data_snapshot',lambda *a,**k:DataSnapshot('filter-fixture','2026-11-10',tmp_path))
+    app=AppTest.from_file(str(root/'streamlit_app.py'),default_timeout=30).run()
+    app.text_input(key='query').set_value(item['itemName'])
+    app.text_input(key='stat1').set_value('공116')
+    next(b for b in app.button if b.label=='검색').click().run()
+    assert not app.exception and len(app.session_state['rows'])==2
+    generation=app.session_state['generation']
+    app.toggle(key='packet_include_gems').set_value(True).run()
+    assert not app.exception and len(app.session_state['rows'])==3
+    assert app.session_state['generation']>generation and app.session_state['page']==1
+    app.selectbox(key='gem_filter').set_value('유보석').run()
+    assert not app.exception and any(c.value.startswith('1건') for c in app.caption)
+    app.selectbox(key='status_filter').set_value('판매완료').run()
+    assert not app.exception and any(c.value.startswith('0건') for c in app.caption)
+    app.selectbox(key='gem_filter').set_value('전체').run()
+    assert any(c.value.startswith('1건') for c in app.caption)
+    app.button(key='history_1').click().run()
+    assert not app.exception and not app.toggle(key='packet_include_gems').value
+    assert len(app.session_state['rows'])==2
