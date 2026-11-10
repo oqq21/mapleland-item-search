@@ -202,7 +202,7 @@ def filter_display_rows(frame,status='전체',gem='전체',now=None):
 def format_stat_text(row,prefix='total',include_gems=False):
     parts=[]
     for s in STATS:
-        if s in {'PDD','MDD','MP','EVA','MAD'}:continue
+        if s in {'PDD','MDD','MP','MAD'}:continue
         value=number(row.get(prefix+'_'+s))
         if s=='INT':value+=number(row.get(prefix+'_MAD'));label='마'
         else:label=LABELS[s]

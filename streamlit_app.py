@@ -19,7 +19,7 @@ from your_app.gui.search_table import render_table
 from your_app.gui.compact_layout import COMPACT_CSS
 
 ROOT=Path(__file__).resolve().parent
-APP_BUILD="2026-11-10-search-v7"
+APP_BUILD="2026-11-10-search-v8"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="expanded")
 st.html(COMPACT_CSS)
 

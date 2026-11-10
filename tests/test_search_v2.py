@@ -87,10 +87,11 @@ def test_common_int_gear_does_not_force_luk_even_in_mage_search():
     assert result['gem_valid'] and '럭' not in result['invalid_reasons']
 
 def test_search_display_total_stats_gems_separate_and_hidden_stats_count():
-    r=row(total_INT=7,total_MAD=120,total_EVA=9,total_MP=80,add_DEX=20,add_MAD=1,add_PDD=1,add_HP=20)
+    r=row(total_INT=7,total_MAD=120,total_EVA=9,total_MP=80,total_PDD=7,total_MDD=8,add_DEX=20,add_MAD=1,add_PDD=1,add_HP=20)
     f=packet_view(pd.DataFrame([r]),True)
     assert '마127' in f.iloc[0]['총스탯'] and '回' not in f.iloc[0]['총스탯']
-    assert '회피' not in f.iloc[0]['총스탯'] and 'MP' not in f.iloc[0]['총스탯']
+    assert '회피9' in f.iloc[0]['총스탯']
+    assert all(label not in f.iloc[0]['총스탯'] for label in ['물방','마방','MP'])
     assert f.iloc[0]['총스탯'].endswith('[ 24 ]')
     assert '추가옵 합' not in f.columns
     r.update(option_codes='16011',gem_DEX=3,total_DEX=10)
