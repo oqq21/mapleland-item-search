@@ -1,10 +1,12 @@
 """Parquet search with newitemp bases, strict conditions and conservative time linking."""
 from __future__ import annotations
 import bisect
+from html import escape
 from functools import lru_cache
 from pathlib import Path
 import pandas as pd
 from your_app.common.stat_query import parse_tokens
+from your_app.common.display_format import price_in_man
 from your_app.domain.search_rules import STATS,LABELS,SUFFIXES,GEM_VALUES,decode_gems,number,color_score,color_key,additional_sum,evaluate_gems,predicted_color
 
 ACTUAL_STATS=list(STATS)
@@ -232,9 +234,17 @@ def packet_view(frame,include_gems=False,prices=None,context=''):
         fast=completed and pd.notna(seconds) and number(seconds)<=120
         state='판매완료' if completed else '만료' if pd.notna(expiry) and expiry<=now else '판매중'
         price=number(row.get('unit_price'));cost=gems['recognized_gem_cost']
-        records.append({'상태':state,'시간':format_packet_time(row),'판매소요':format_sale_duration(row),'아이템':row.get('itemName',''),
-            '총스탯':format_stat_text(row),'추가옵 합':'' if gems['has_gems'] else additional_sum(row),'업횟':number(row.get('total_upgrade_left')),'작횟':number(row.get('total_work_count')),
-            '판매가(만)':round(price/10000,2),'보석제외가(만)':round((price-cost)/10000,2),'보석':gems['gem_text'],'인정보석원가(만)':round(cost/10000,2),
+        stats=format_stat_text(row);stats_html=escape(stats)
+        upgrade=number(row.get('total_upgrade_left'));work=number(row.get('total_work_count'))
+        if upgrade>0:
+            stats+=f' 업{upgrade}'
+            stats_html+=f' <span class="upgrade-left" style="color:#b42318;font-weight:700" title="남은 업횟">업{upgrade}</span>'
+        if not gems['has_gems']:
+            stats+=f' [ {additional_sum(row)} ]';stats_html+=f' [ {additional_sum(row)} ]'
+        name=str(row.get('itemName',''))+(f' {work}작' if work>0 else '')
+        records.append({'상태':state,'시간':format_packet_time(row),'판매소요':format_sale_duration(row),'아이템':name,
+            '총스탯':stats,'_총스탯HTML':stats_html,
+            '판매가(만)':price_in_man(price),'보석제외가(만)':price_in_man(price-cost),'보석':gems['gem_text'],'인정보석원가(만)':price_in_man(cost),
             '무효 사유':gems['invalid_reasons'],
             '_아이템색':color_key(color_score(row)),'_예상색':predicted_color(row),'_보석HTML':gems['gem_html'],'_보석셀':gems['gem_cell_style'],'_빠른판매':fast,'_시간설명':str(row.get('_time_reason','')),'_code':number(row.get('itemCode'))})
     return pd.DataFrame(records)

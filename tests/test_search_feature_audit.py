@@ -79,6 +79,33 @@ def test_gem_excluded_price_is_full_cost_and_may_be_negative():
     assert view.iloc[0]['보석제외가(만)']==-875
 
 
+@pytest.mark.parametrize('mesos,expected',[(0,0),(4999,0),(5000,1),(14999,1),(15000,2),(1005000,101),(-4999,0),(-5000,-1),(-15000,-2)])
+def test_price_display_rounds_half_up_in_man_units(mesos,expected):
+    from your_app.common.display_format import price_in_man
+    assert price_in_man(mesos)==expected
+
+
+def test_compact_stats_and_work_count_do_not_add_columns():
+    from your_app.gui.search_table import COLUMNS
+    source=row(itemName='테스트 신발',total_DEX=7,add_DEX=24,total_upgrade_left=2,total_work_count=3,unit_price=123455000)
+    view=packet_view(pd.DataFrame([source]));record=view.iloc[0]
+    assert record['아이템']=='테스트 신발 3작'
+    assert record['총스탯']=='덱7 업2 [ 24 ]'
+    assert 'color:#b42318' in record['_총스탯HTML'] and '>업2</span>' in record['_총스탯HTML']
+    assert record['판매가(만)']==12346
+    assert source['unit_price']==123455000
+    assert not {'추가옵 합','업횟','작횟'} & set(view.columns)
+    assert not {'추가옵 합','업횟','작횟'} & set(COLUMNS)
+    rendered=render_table(view)
+    assert '12,346' in rendered and '12,345.5' not in rendered
+    assert '<th scope="col">업횟</th>' not in rendered
+    assert '덱7 <span class="upgrade-left"' in rendered
+    source.update(total_upgrade_left=0,total_work_count=0,option_codes='26011')
+    record=packet_view(pd.DataFrame([source])).iloc[0]
+    assert record['총스탯']=='덱7' and record['아이템']=='테스트 신발'
+    assert 'upgrade-left' not in record['_총스탯HTML']
+
+
 def test_fast_sale_boundary_and_completed_red_priority():
     view=packet_view(pd.DataFrame([
         row(status='completed',_sale_duration_seconds=59),

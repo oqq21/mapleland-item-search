@@ -11,6 +11,7 @@ import streamlit as st
 from your_app.common.remote_data import ensure_data_snapshot
 from your_app.common.query_utils import mask_for_item_query, _ensure_cache_columns
 from your_app.common.stat_query import parse_tokens
+from your_app.common.display_format import price_in_man
 from your_app.common.site_links import search_page_url
 from your_app.domain.search_rules import context_for_query, number
 from your_app.processing.packet_search import search_packet_data, packet_view, format_stat_text, GEM_OPTION_LABELS, BASE_COLUMNS, filter_display_rows
@@ -18,7 +19,7 @@ from your_app.gui.search_table import render_table
 from your_app.gui.compact_layout import COMPACT_CSS
 
 ROOT=Path(__file__).resolve().parent
-APP_BUILD="2026-11-10-search-v3"
+APP_BUILD="2026-11-10-search-v4"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="collapsed")
 st.html(COMPACT_CSS)
 
@@ -93,7 +94,7 @@ def show_gem_prices():
     header='<tr><th>보석</th><th>상급(만)</th><th>중급(만)</th><th>하급(만)</th></tr>'
     rows=[]
     for suffix,(label,_) in GEM_OPTION_LABELS.items():
-        cells=''.join('<td>'+f'{number(prices.get(str(base+suffix)))/10000:,.2f}'.rstrip('0').rstrip('.')+'</td>' for base in (26000,16000,6000))
+        cells=''.join('<td>'+f'{price_in_man(prices.get(str(base+suffix),0)):,}'+'</td>' for base in (26000,16000,6000))
         rows.append('<tr><td>'+escape(label)+'</td>'+cells+'</tr>')
     st.html('<table class="gem-price-table"><thead>'+header+'</thead><tbody>'+''.join(rows)+'</tbody></table>')
     st.caption('보석 재료값 기준 · 단위: 만 메소')
@@ -169,7 +170,8 @@ with st.container(key='workspace',gap='xxsmall'):
         nav=st.columns([.65,.65,8],vertical_alignment='center',wrap=False)
         if nav[0].button('이전',disabled=st.session_state.page<=1):st.session_state.page-=1;st.rerun()
         if nav[1].button('다음',disabled=st.session_state.page>=pages):st.session_state.page+=1;st.rerun()
-        nav[2].caption(f'{count:,}건 · {st.session_state.page}/{pages}페이지 · 중복제외 {st.session_state.duplicates:,}건 · 검색 {st.session_state.elapsed:.2f}초')
+        elapsed='1초 미만' if st.session_state.elapsed<1 else f'{round(st.session_state.elapsed)}초'
+        nav[2].caption(f'{count:,}건 · {st.session_state.page}/{pages}페이지 · 중복제외 {st.session_state.duplicates:,}건 · 검색 {elapsed}')
         start=(st.session_state.page-1)*100
         context=context_for_query(st.session_state.get('applied_query',''))
         if any(c.name=='단도' for c in parse_tokens(st.session_state.get('applied_tokens',[]))):context='섀도어'

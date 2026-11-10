@@ -91,11 +91,12 @@ def test_search_display_total_stats_gems_separate_and_hidden_stats_count():
     f=packet_view(pd.DataFrame([r]),True)
     assert '마127' in f.iloc[0]['총스탯'] and '回' not in f.iloc[0]['총스탯']
     assert '회피' not in f.iloc[0]['총스탯'] and 'MP' not in f.iloc[0]['총스탯']
-    assert f.iloc[0]['추가옵 합']==24
+    assert f.iloc[0]['총스탯'].endswith('[ 24 ]')
+    assert '추가옵 합' not in f.columns
     r.update(option_codes='16011',gem_DEX=3,total_DEX=10)
     f=packet_view(pd.DataFrame([r]),True,prices={'16011':100})
     assert '덱10' in f.iloc[0]['총스탯'] and '덱13' not in f.iloc[0]['총스탯']
-    assert f.iloc[0]['추가옵 합']=='' and '#8A4B08' in f.iloc[0]['_보석HTML']
+    assert '[' not in f.iloc[0]['총스탯'] and '#8A4B08' in f.iloc[0]['_보석HTML']
 
 def test_time_crosses_midnight_and_keeps_uncertain_one_day_unknown():
     a=pd.DataFrame([row(captured_at='2026-11-09 23:59:45',internal_time='2026-11-12 23:59:40')])
