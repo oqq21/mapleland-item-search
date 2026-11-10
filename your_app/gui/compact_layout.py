@@ -2,7 +2,13 @@
 
 COMPACT_CSS = '''<style>
 html, body, [data-testid="stAppViewContainer"] {height:100%;overflow:hidden;}
-[data-testid="stHeader"], [data-testid="stSidebar"], footer {display:none;}
+[data-testid="stHeader"], footer {display:none;}
+[data-testid="stSidebar"] {width:176px!important;min-width:176px!important;max-width:176px!important;}
+[data-testid="stSidebarUserContent"] {padding:12px 8px;}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {gap:5px;}
+[data-testid="stSidebar"] button {min-height:34px;padding:5px 8px;}
+[data-testid="stSidebar"] button p {font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {font-size:13px;}
 [data-testid="stMain"] {height:100dvh;overflow:hidden;}
 [data-testid="stMainBlockContainer"] {height:100%;max-width:100%;padding:8px 12px;overflow:hidden;}
 [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] {height:100%;min-height:0;gap:0;}
@@ -34,8 +40,8 @@ html, body, [data-testid="stAppViewContainer"] {height:100%;overflow:hidden;}
 .st-key-workspace [class*="st-key-results_"] [data-testid="stElementContainer"] {height:100%;min-height:0;}
 .st-key-workspace [class*="st-key-results_"] [data-testid="stHtml"] {height:100%;min-height:0;}
 .st-key-workspace .search-grid {height:100%;max-height:none;min-height:0;overscroll-behavior:contain;}
-.st-key-workspace .search-grid th {padding:8px 10px;}
-.st-key-workspace .search-grid td {padding:7px 10px;}
+.st-key-workspace .search-grid th {padding:7px 6px;}
+.st-key-workspace .search-grid td {padding:6px;}
 [data-testid="stPopoverBody"] {max-height:75dvh;overflow:auto;overscroll-behavior:contain;}
 [data-testid="stPopoverBody"] button {min-height:36px;padding:5px 11px;}
 [data-testid="stPopoverBody"] p {font-size:16px;}

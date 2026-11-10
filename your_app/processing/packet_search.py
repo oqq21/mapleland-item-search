@@ -245,6 +245,9 @@ def packet_view(frame,include_gems=False,prices=None,context=''):
             stats_html+=f' <span class="upgrade-left" style="color:#b42318;font-weight:700" title="남은 업횟">업{upgrade}</span>'
         if not gems['has_gems']:
             stats+=f' [ {additional_sum(row)} ]';stats_html+=f' [ {additional_sum(row)} ]'
+        else:
+            stats='■ '+stats
+            stats_html='<span class="gem-marker" style="color:#111111" title="보석 장착">■</span> '+stats_html
         name=str(row.get('itemName',''))+(f' {work}작' if work>0 else '')
         records.append({'상태':state,'시간':format_packet_time(row),'판매소요':format_sale_duration(row),'아이템':name,
             '총스탯':stats,'_총스탯HTML':stats_html,

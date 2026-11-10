@@ -24,6 +24,7 @@ def test_search_history_pagination_and_no_market_api(tmp_path,monkeypatch):
     assert not app.sidebar.button and not app.title
     assert [field.key for field in app.text_input]==['query','stat1','stat2','stat3']
     assert [field.label for field in app.text_input]==['이름','스탯1','스탯2','스탯3']
+    assert app.button_group(key='status_filter').options==['전체','판매완료']
     assert all('판매 API' not in b.label and '구매 API' not in b.label for b in app.button)
     def search(value):
         app.text_input(key='query').set_value(item['itemName'])
@@ -32,6 +33,7 @@ def test_search_history_pagination_and_no_market_api(tmp_path,monkeypatch):
         assert not app.exception
     search('공116')
     assert len(app.session_state['rows'])==105
+    assert len(app.sidebar.button)==1 and app.sidebar.button[0].key=='history_0'
     next(b for b in app.button if b.label=='다음').click().run()
     assert app.session_state['page']==2
     search('공117')

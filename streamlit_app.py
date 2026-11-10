@@ -19,8 +19,8 @@ from your_app.gui.search_table import render_table
 from your_app.gui.compact_layout import COMPACT_CSS
 
 ROOT=Path(__file__).resolve().parent
-APP_BUILD="2026-11-10-search-v5"
-st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="collapsed")
+APP_BUILD="2026-11-10-search-v6"
+st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="expanded")
 st.html(COMPACT_CSS)
 
 @st.cache_resource
@@ -44,7 +44,7 @@ except Exception as exc:
 
 for key,value in {'query':'','stat1':'','stat2':'','stat3':'','packet_include_gems':False,'history':[],'page':1,'generation':0,'searched':False,'request_search':False,'status_filter':'전체','gem_filter':'전체'}.items():
     if key not in st.session_state:st.session_state[key]=value
-for key,allowed in {'status_filter':{'전체','판매중','판매완료','만료'},'gem_filter':{'전체','유보석','무보석'}}.items():
+for key,allowed in {'status_filter':{'전체','판매완료'},'gem_filter':{'전체','유보석','무보석'}}.items():
     if st.session_state[key] not in allowed:st.session_state[key]='전체'
 
 def restore_history(index):
@@ -100,36 +100,39 @@ def show_gem_prices():
     st.caption('보석 재료값 기준 · 단위: 만 메소')
 
 
+with st.sidebar:
+    st.markdown('**최근 검색**')
+    if not st.session_state.history:st.caption('최근 9개 검색이 남아요.')
+    for i,h in enumerate(st.session_state.history):
+        label=' · '.join(str(h[k]) for k in ('query','stat1','stat2','stat3') if h[k]) or '전체 검색'
+        if h['packet_include_gems']:label+=' · 보석 포함'
+        st.button(label,key=f'history_{i}',help=label,on_click=restore_history,args=(i,),width='stretch')
+
+
 with st.container(key='workspace',gap='xxsmall'):
-    top=st.columns([2.5,1.05,.8,.8,.8,3.1],vertical_alignment='center',wrap=False)
-    top[0].html('<div class="app-title">메랜 아이템검색</div>')
-    with top[1].popover('최근 검색',width='stretch'):
-        if not st.session_state.history:st.caption('최근 9개 검색이 여기에 남아요.')
-        for i,h in enumerate(st.session_state.history):
-            label=' · '.join(str(h[k]) for k in ('query','stat1','stat2','stat3') if h[k]) or '전체 검색'
-            if h['packet_include_gems']:label+=' · 보석 포함'
-            st.button(label,key=f'history_{i}',on_click=restore_history,args=(i,),width='stretch')
-    with top[2].popover('기본옵',width='stretch'):
-        matched=st.session_state.get('matched',pd.DataFrame())
-        if matched.empty:st.caption('검색 후 일치 품목의 기본옵을 볼 수 있어요.')
-        else:
-            names=matched[['itemCode','itemName','sheet','직업','reqLevel']].copy()
-            names['기본업횟']=matched['업횟']
-            names['기본스탯']=matched.apply(lambda r:format_stat_text({'base_'+s:number(r.get(label)) for s,label in BASE_COLUMNS.items()},'base'),axis=1)
-            st.dataframe(names.rename(columns={'itemCode':'코드','itemName':'품목','sheet':'부위','reqLevel':'레벨'}),hide_index=True,width='stretch',height=300)
-    if top[3].button('보석값',width='stretch'):show_gem_prices()
-    with top[4].popover('도움말',width='stretch'):
-        st.write('궁수13: 정확값 / 궁수~13: 이하 / 궁수13~: 이상 / 궁수13~15: 구간')
-        st.write('줄임말: 명·이·전·궁·도·단. 작 방향은 항상 보석 제외 추가치입니다.')
-        st.write('법사=인트+럭+마력. 마·인·인트=합마. 법신=추가 인트+럭+마력.')
-        st.write('노작=남은 업횟이 기본 업횟과 같음. 완작·업6·작5도 검색할 수 있습니다.')
-        st.write('필수 상급: 파랑·굵게 / 보조 상급: 보라 / 무효옵: 회색 / 상급 미만: 황갈색')
-        st.write('확인된 2분 이하 판매만 빨강. 판매소요가 미확인이면 마우스를 올려 사유를 볼 수 있습니다.')
-        st.write('완료와 연결된 매물은 판매중 수집시각으로 정렬합니다. 새 검색·기록 선택은 목록 맨 위부터 시작합니다.')
-        st.write('외부 검색페이지는 메랜지지가 지원하는 조건 범위로 열립니다.')
-        st.caption('자료 갱신 시각: '+snapshot.updated_at+' · GitHub 읽기 전용')
-        st.caption(APP_BUILD)
-    top[5].html('<div class="app-meta">본체 총스탯 / 보석 분리 · '+APP_BUILD+'</div>')
+    with st.container(key='toolbar',horizontal=True,wrap=False,vertical_alignment='center',gap='xsmall'):
+        st.html('<div class="app-title">메랜 아이템검색</div>',width=220)
+        with st.popover('기본옵'):
+            matched=st.session_state.get('matched',pd.DataFrame())
+            if matched.empty:st.caption('검색 후 일치 품목의 기본옵을 볼 수 있어요.')
+            else:
+                names=matched[['itemCode','itemName','sheet','직업','reqLevel']].copy()
+                names['기본업횟']=matched['업횟']
+                names['기본스탯']=matched.apply(lambda r:format_stat_text({'base_'+s:number(r.get(label)) for s,label in BASE_COLUMNS.items()},'base'),axis=1)
+                st.dataframe(names.rename(columns={'itemCode':'코드','itemName':'품목','sheet':'부위','reqLevel':'레벨'}),hide_index=True,width='stretch',height=300)
+        if st.button('보석값'):show_gem_prices()
+        with st.popover('도움말'):
+            st.write('궁수13: 정확값 / 궁수~13: 이하 / 궁수13~: 이상 / 궁수13~15: 구간')
+            st.write('줄임말: 명·이·전·궁·도·단. 작 방향은 항상 보석 제외 추가치입니다.')
+            st.write('법사=인트+럭+마력. 마·인·인트=합마. 법신=추가 인트+럭+마력.')
+            st.write('노작=남은 업횟이 기본 업횟과 같음. 완작·업6·작5도 검색할 수 있습니다.')
+            st.write('필수 상급: 파랑·굵게 / 보조 상급: 보라 / 무효옵: 회색 / 상급 미만: 황갈색')
+            st.write('확인된 2분 이하 판매만 빨강. 판매소요가 미확인이면 마우스를 올려 사유를 볼 수 있습니다.')
+            st.write('완료와 연결된 매물은 판매중 수집시각으로 정렬합니다. 새 검색·기록 선택은 목록 맨 위부터 시작합니다.')
+            st.write('외부 검색페이지는 메랜지지가 지원하는 조건 범위로 열립니다.')
+            st.caption('자료 갱신 시각: '+snapshot.updated_at+' · GitHub 읽기 전용')
+            st.caption(APP_BUILD)
+        st.html('<div class="app-meta">본체 총스탯 / 보석 분리 · '+APP_BUILD+'</div>')
 
     search_area,filter_area=st.columns([3.4,4.6],vertical_alignment='top',wrap=False)
     with search_area.container(key='search_fields',gap='xxsmall'):
@@ -142,7 +145,7 @@ with st.container(key='workspace',gap='xxsmall'):
     with filter_area.container(key='filter_fields',gap='xxsmall'):
         trade=st.columns([.5,4],vertical_alignment='center',wrap=False)
         trade[0].html('<div class="filter-label">거래</div>')
-        status_filter=trade[1].segmented_control('거래 상태',['전체','판매중','판매완료','만료'],key='status_filter',required=True,label_visibility='collapsed')
+        status_filter=trade[1].segmented_control('거래 상태',['전체','판매완료'],key='status_filter',required=True,label_visibility='collapsed')
         gem=st.columns([.5,4],vertical_alignment='center',wrap=False)
         gem[0].html('<div class="filter-label">보석</div>')
         gem_filter=gem[1].segmented_control('보석 장착',['전체','유보석','무보석'],key='gem_filter',required=True,label_visibility='collapsed')

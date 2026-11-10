@@ -102,8 +102,23 @@ def test_compact_stats_and_work_count_do_not_add_columns():
     assert '덱7 <span class="upgrade-left"' in rendered
     source.update(total_upgrade_left=0,total_work_count=0,option_codes='26011')
     record=packet_view(pd.DataFrame([source])).iloc[0]
-    assert record['총스탯']=='덱7' and record['아이템']=='테스트 신발'
+    assert record['총스탯']=='■ 덱7' and record['아이템']=='테스트 신발'
+    assert 'title="보석 장착">■</span>' in record['_총스탯HTML']
     assert 'upgrade-left' not in record['_총스탯HTML']
+
+
+def test_equipped_marker_is_display_only_and_warning_is_not_lost():
+    equipped=row(total_DEX=7,option_codes='26011')
+    view=packet_view(pd.DataFrame([equipped,row(total_DEX=7)]))
+    assert view.iloc[0]['총스탯'].startswith('■ ')
+    assert not view.iloc[1]['총스탯'].startswith('■ ')
+    assert equipped['total_DEX']==7
+    html=render_table(view)
+    assert 'color:#111111' in html and '보석 장착' in html
+    assert '필수 누락' in html
+    assert '무효 사유</th>' in html
+    clean=render_table(packet_view(pd.DataFrame([row()])))
+    assert '무효 사유</th>' not in clean
 
 
 def test_fast_sale_boundary_and_completed_red_priority():
