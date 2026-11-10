@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 from tests.test_search_v2 import row
 from your_app.domain.search_rules import color_key, color_score, predicted_color, gem_profile, evaluate_gems
-from your_app.processing.packet_search import filter_packet_rows, packet_view, search_packet_data, prepare_rows
+from your_app.processing.packet_search import filter_packet_rows, packet_view, search_packet_data, prepare_rows, filter_display_rows
 from your_app.gui.search_table import render_table
 
 
@@ -94,8 +94,30 @@ def test_fast_sale_boundary_and_completed_red_priority():
 
 def test_expired_listing_not_treated_as_completed():
     view=packet_view(pd.DataFrame([row(_expiry_at=pd.Timestamp('2020-01-01'))]))
-    assert view.iloc[0]['상태']=='만료 / 완료 미확인'
-    assert view.iloc[0]['남은 시간']=='만료'
+    assert view.iloc[0]['상태']=='만료'
+    assert '남은 시간' not in view.columns and '만료 예정' not in view.columns
+
+
+def test_status_buttons_separate_expired_from_selling_and_completed():
+    frame=prepare_rows(pd.DataFrame([
+        row(itemCode=1,internal_time='2026-11-10 09:00:00'),
+        row(itemCode=2,internal_time='2026-11-10 11:00:00'),
+        row(itemCode=3,status='completed',internal_time='2026-11-10 09:00:00'),
+    ]))
+    now=pd.Timestamp('2026-11-10 10:00:00')
+    assert filter_display_rows(frame,'만료',now=now).itemCode.tolist()==[1]
+    assert filter_display_rows(frame,'판매중',now=now).itemCode.tolist()==[2]
+    assert filter_display_rows(frame,'판매완료',now=now).itemCode.tolist()==[3]
+    assert len(filter_display_rows(frame,'전체',now=now))==3
+
+
+def test_missing_sale_duration_is_visible_and_has_reason():
+    from your_app.processing.packet_search import deduplicate_active_completed
+    _,completed,_=deduplicate_active_completed(pd.DataFrame(),pd.DataFrame([row(status='completed')]))
+    view=packet_view(completed)
+    assert view.iloc[0]['판매소요']=='미확인'
+    assert view.iloc[0]['_시간설명']=='연결할 판매중 자료 없음'
+    assert '연결할 판매중 자료 없음' in render_table(view)
 
 
 @pytest.mark.parametrize('tokens,include_gems',[

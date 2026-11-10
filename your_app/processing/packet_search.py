@@ -108,6 +108,7 @@ def add_packet_times(frame):
     near=(cap-anchor).between(pd.Timedelta(0),pd.Timedelta(minutes=10))
     work['_sale_at']=anchor.where(near & work.status.eq('completed'))
     work['_registered_at']=pd.NaT;work['_time_reason']='등록기간 미확인'
+    work.loc[work.status.eq('completed'),'_time_reason']='연결할 판매중 자료 없음'
     # Around one day could be a newly found old 3-day listing. Keep it unknown.
     known3=(internal-cap).between(pd.Timedelta(days=2),pd.Timedelta(days=3))
     reg=internal-pd.Timedelta(days=3)
@@ -175,6 +176,23 @@ def search_packet_data(active_path,completed_path,item_codes,tokens,include_gems
     combined['_sort_time']=combined['_linked_active_at'].fillna(combined['_captured_time']) if '_linked_active_at' in combined else combined['_captured_time']
     return combined.sort_values('_sort_time',ascending=False,kind='mergesort').reset_index(drop=True),count
 
+
+def filter_display_rows(frame,status='전체',gem='전체',now=None):
+    """UI-only filters; expire active listings without changing raw trade status."""
+    if frame.empty:return frame
+    now=pd.Timestamp.now(tz='Asia/Seoul') if now is None else pd.Timestamp(now)
+    if now.tzinfo is not None:now=now.tz_convert('Asia/Seoul').tz_localize(None)
+    expiry=_kst_naive(frame.get('_expiry_at',frame.get('internal_time',pd.Series(pd.NaT,index=frame.index))))
+    completed=frame.status.eq('completed')
+    expired=~completed & expiry.le(now)
+    mask=pd.Series(True,index=frame.index)
+    if status=='판매완료':mask &= completed
+    elif status=='만료':mask &= expired
+    elif status=='판매중':mask &= ~completed & ~expired
+    if gem=='무보석':mask &= ~frame.has_gems
+    elif gem=='유보석':mask &= frame.has_gems
+    return frame.loc[mask]
+
 def format_stat_text(row,prefix='total',include_gems=False):
     parts=[]
     for s in STATS:
@@ -199,7 +217,8 @@ def format_packet_time(row):
 
 def format_sale_duration(row):
     n=row.get('_sale_duration_seconds')
-    if str(row.get('status',''))!='completed' or pd.isna(n):return ''
+    if str(row.get('status',''))!='completed':return ''
+    if pd.isna(n):return '미확인'
     n=number(n)
     return f'{n}초' if n<60 else f'{n//60}분' if n<3600 else f'{n//3600}시간' if n<86400 else f'{n//86400}일'
 
@@ -211,12 +230,11 @@ def packet_view(frame,include_gems=False,prices=None,context=''):
         expiry=pd.to_datetime(row.get('_expiry_at',row.get('internal_time')),errors='coerce')
         completed=row.get('status')=='completed';seconds=row.get('_sale_duration_seconds')
         fast=completed and pd.notna(seconds) and number(seconds)<=120
-        state='판매완료' if completed else '만료 / 완료 미확인' if pd.notna(expiry) and expiry<now else '판매중 추정'
+        state='판매완료' if completed else '만료' if pd.notna(expiry) and expiry<=now else '판매중'
         price=number(row.get('unit_price'));cost=gems['recognized_gem_cost']
-        remain=max(0,int((expiry-now).total_seconds())) if not completed and pd.notna(expiry) else None
         records.append({'상태':state,'시간':format_packet_time(row),'판매소요':format_sale_duration(row),'아이템':row.get('itemName',''),
             '총스탯':format_stat_text(row),'추가옵 합':'' if gems['has_gems'] else additional_sum(row),'업횟':number(row.get('total_upgrade_left')),'작횟':number(row.get('total_work_count')),
             '판매가(만)':round(price/10000,2),'보석제외가(만)':round((price-cost)/10000,2),'보석':gems['gem_text'],'인정보석원가(만)':round(cost/10000,2),
-            '무효 사유':gems['invalid_reasons'],'만료 예정':'' if completed or pd.isna(expiry) else str(expiry),'남은 시간':'' if remain is None else '만료' if remain==0 else f'{remain//86400}일 {(remain%86400)//3600}시간 {(remain%3600)//60}분',
+            '무효 사유':gems['invalid_reasons'],
             '_아이템색':color_key(color_score(row)),'_예상색':predicted_color(row),'_보석HTML':gems['gem_html'],'_보석셀':gems['gem_cell_style'],'_빠른판매':fast,'_시간설명':str(row.get('_time_reason','')),'_code':number(row.get('itemCode'))})
     return pd.DataFrame(records)
