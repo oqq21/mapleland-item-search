@@ -20,18 +20,18 @@ DATA_FILES = (
     "gem_prices.json",
 )
 DEFAULT_RELEASE_API = (
-    "https://api.github.com/repos/oqq21/ppoo213/releases/tags/web-data-latest"
+    "https://api.github.com/repos/oqq21/mapleland-item-search/releases/tags/web-data-latest"
 )
 DEFAULT_MANIFEST_URL = (
-    "https://github.com/oqq21/ppoo213/releases/download/"
+    "https://github.com/oqq21/mapleland-item-search/releases/download/"
     "web-data-latest/manifest.json"
 )
 DEFAULT_FALLBACK_MANIFEST_URL = (
-    "https://github.com/oqq21/ppoo213/releases/download/"
+    "https://github.com/oqq21/mapleland-item-search/releases/download/"
     "web-data-latest/manifest-fallback.json"
 )
 DEFAULT_ASSET_BASE_URL = (
-    "https://github.com/oqq21/ppoo213/releases/download/web-data-latest"
+    "https://github.com/oqq21/mapleland-item-search/releases/download/web-data-latest"
 )
 _LOCK = threading.Lock()
 _STATE: dict[str, object] = {

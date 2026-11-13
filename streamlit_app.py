@@ -19,7 +19,7 @@ from your_app.gui.search_table import render_table
 from your_app.gui.compact_layout import COMPACT_CSS
 
 ROOT=Path(__file__).resolve().parent
-APP_BUILD="2026-11-10-search-v9"
+APP_BUILD="2026-11-13-search-v10-own-data"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="expanded")
 st.html(COMPACT_CSS)
 
@@ -36,7 +36,7 @@ def run_search(directory,version,codes,tokens,include_gems):
 
 items,catalog=load_catalog()
 try:
-    cache=Path(os.environ.get('PP213_DATA_CACHE_DIR',str(Path(tempfile.gettempdir())/'mapleland-item-search-data')))
+    cache=Path(os.environ.get('PP213_DATA_CACHE_DIR',str(Path(tempfile.gettempdir())/'mapleland-item-search-own-data')))
     snapshot=ensure_data_snapshot(cache,check_interval=3600)
     prices=json.loads(snapshot.path('gem_prices.json').read_text(encoding='utf-8'))
 except Exception as exc:
