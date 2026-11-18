@@ -97,3 +97,44 @@ def test_gem_toggle_and_both_filters_in_real_entrypoint(tmp_path,monkeypatch):
     html=[node.proto.body for node in app.get('html') if 'gem-price-table' in node.proto.body and '<table' in node.proto.body]
     assert len(html)==1 and html[0].count('<tr>')==13
     assert all(label in html[0] for label in ['상급(만)','중급(만)','하급(만)','인트','덱','마력'])
+
+
+def test_stat_marker_applies_gems_to_all_fields_and_restores_from_history(tmp_path,monkeypatch):
+    import your_app.common.remote_data as remote
+    root=Path(__file__).resolve().parents[1]
+    catalog=json.loads((root/'resources/item_catalog.json').read_text(encoding='utf-8'))
+    item=next(r for r in catalog if r['itemName'].replace(' ','')=='블루아이젠')
+    base=row(itemCode=item['itemCode'],total_DEX=12,total_LUK=8,total_ACC=4,total_upgrade_left=5)
+    gemmed=dict(base,total_DEX=7,total_ACC=1,gem_DEX=5,gem_ACC=3,option_codes='26011,16002',quantity=2)
+    pd.DataFrame([base,gemmed]).to_parquet(tmp_path/'packet_active.parquet')
+    pd.DataFrame([dict(base,status='completed',total_DEX=0)]).to_parquet(tmp_path/'packet_completed.parquet')
+    (tmp_path/'gem_prices.json').write_text('{}',encoding='utf-8')
+    monkeypatch.setattr(remote,'ensure_data_snapshot',lambda *a,**k:DataSnapshot('marker-fixture','2026-11-18',tmp_path))
+    app=AppTest.from_file(str(root/'streamlit_app.py'),default_timeout=30).run()
+    app.text_input(key='query').set_value(f"@{item['itemName']}@")
+    app.text_input(key='stat1').set_value('도적20')
+    app.text_input(key='stat2').set_value('명4')
+    next(b for b in app.button if b.label=='검색').click().run()
+    assert not app.exception and not app.error
+    assert not app.session_state['applied_include_gems']
+    assert app.session_state['rows']['quantity'].tolist()==[1]
+
+    for field,value in (('stat1','@도적20'),('stat1','도적20@'),('stat2','명4@'),('stat3','@업5@')):
+        app.text_input(key='stat1').set_value('도적20')
+        app.text_input(key='stat2').set_value('명4')
+        app.text_input(key='stat3').set_value('')
+        app.text_input(key=field).set_value(value).run()
+        assert not app.exception and not app.error
+        assert app.session_state['applied_include_gems']
+        assert set(app.session_state['rows']['quantity'])=={1,2}
+        assert not app.toggle(key='packet_include_gems').value
+
+    app.text_input(key='stat3').set_value('업5').run()
+    assert not app.session_state['applied_include_gems']
+    assert app.session_state['rows']['quantity'].tolist()==[1]
+    app.button(key='history_1').click().run()
+    assert app.text_input(key='stat3').value=='@업5@'
+    assert app.session_state['applied_include_gems']
+    assert set(app.session_state['rows']['quantity'])=={1,2}
+    app.text_input(key='stat3').set_value('@').run()
+    assert app.error and not app.exception

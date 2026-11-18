@@ -11,7 +11,7 @@ import pandas as pd
 import streamlit as st
 from your_app.common.remote_data import ensure_data_snapshot
 from your_app.common.query_utils import mask_for_item_query, _ensure_cache_columns
-from your_app.common.stat_query import parse_tokens
+from your_app.common.stat_query import parse_tokens, split_gem_markers
 from your_app.common.display_format import price_in_man
 from your_app.common.site_links import search_page_url
 from your_app.domain.search_rules import context_for_query, number
@@ -22,7 +22,7 @@ from your_app.gui.compact_layout import COMPACT_CSS
 ROOT=Path(__file__).resolve().parent
 CATALOG_PATH=ROOT/'resources/item_catalog.json'
 CATALOG_REVISION=CATALOG_PATH.stat().st_mtime_ns
-APP_BUILD="2026-11-18-search-v13-history-grid"
+APP_BUILD="2026-11-18-search-v14-gem-marker"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="collapsed")
 st.html(COMPACT_CSS)
 
@@ -77,21 +77,23 @@ search_feedback=st.empty()
 if st.session_state.request_search:
     st.session_state.request_search=False
     query=st.session_state.query.strip()
-    tokens=[st.session_state[k].strip() for k in ('stat1','stat2','stat3') if st.session_state[k].strip()]
     try:
-        parse_tokens(tokens)
+        tokens, gem_marker=split_gem_markers(st.session_state[k] for k in ('stat1','stat2','stat3'))
+        conditions=parse_tokens(tokens)
+        include_gems=gem_marker or st.session_state.packet_include_gems
         if not query and not tokens:raise ValueError('아이템명 또는 스탯 조건을 입력해주세요.')
         matched=items.loc[mask_for_item_query(items,query)] if query else items
         matched=matched.loc[pd.to_numeric(matched.itemCode,errors='coerce').between(1000000,1999999)]
-        if query=='단도' or any(c.name=='단도' for c in parse_tokens(tokens)):
+        if query=='단도' or any(c.name=='단도' for c in conditions):
             matched=matched.loc[pd.to_numeric(matched.get('힘',pd.Series(0,index=matched.index)),errors='coerce').fillna(0).ne(0)]
         codes=tuple(sorted(set(matched.itemCode.astype(int))))
         started=time.perf_counter()
         with search_feedback.container():
             with st.spinner('조건에 맞는 매물을 찾는 중…'):
-                rows,duplicates=run_search(str(snapshot.directory.resolve()),f'{snapshot.version}:{APP_BUILD}',CATALOG_REVISION,codes,tuple(tokens),st.session_state.packet_include_gems)
+                rows,duplicates=run_search(str(snapshot.directory.resolve()),f'{snapshot.version}:{APP_BUILD}',CATALOG_REVISION,codes,tuple(tokens),include_gems)
         st.session_state.rows=rows;st.session_state.duplicates=duplicates
         st.session_state.matched=matched;st.session_state.applied_query=query;st.session_state.applied_tokens=tokens
+        st.session_state.applied_include_gems=include_gems
         st.session_state.elapsed=time.perf_counter()-started
         st.session_state.searched=True;st.session_state.page=1;st.session_state.generation+=1
         saved={k:st.session_state[k] for k in ('query','stat1','stat2','stat3','packet_include_gems')}
@@ -128,6 +130,7 @@ with st.container(key='workspace',gap='xxsmall'):
         if st.button('보석값'):show_gem_prices()
         with st.popover('도움말'):
             st.write('궁수13: 정확값 / 궁수~13: 이하 / 궁수13~: 이상 / 궁수13~15: 구간')
+            st.write('스탯 앞이나 뒤에 @를 붙이면 모든 스탯 조건에 보석을 포함합니다. 예: @도적20, 도적20@')
             st.write('줄임말: 명·이·전·궁·도·단. 작 방향은 항상 보석 제외 추가치입니다.')
             st.write('법사=인트+럭+마력. 마·인·인트=합마. 법신=추가 인트+럭+마력.')
             st.write('노작=남은 업횟이 기본 업횟과 같음. 완작·업6·작5도 검색할 수 있습니다.')
@@ -156,7 +159,7 @@ with st.container(key='workspace',gap='xxsmall'):
                 st.html('<div class="filter-label">보석</div>',width='content')
                 gem_filter=st.segmented_control('보석 장착',['전체','유보석','무보석'],key='gem_filter',required=True,label_visibility='collapsed')
             with st.container(horizontal=True,vertical_alignment='center',gap='xsmall'):
-                st.toggle('보석 포함 검색',key='packet_include_gems',on_change=request_search,help='검색 조건에만 보석을 더합니다. 본체 숫자와 보석은 나누어 표시합니다.')
+                st.toggle('보석 포함 검색',key='packet_include_gems',on_change=request_search,help='스탯 조건에 @를 붙여도 보석을 포함해 검색합니다.')
                 external_slot=st.empty()
             applied_slot=st.empty()
         if st.session_state.history:
@@ -172,7 +175,9 @@ with st.container(key='workspace',gap='xxsmall'):
     if not matched.empty:
         link=search_page_url(matched,st.session_state.get('applied_tokens',[]))
         if link:external_slot.link_button('검색페이지 열기',link)
-        applied=' · '.join([st.session_state.get('applied_query','') or '전체 품목',*st.session_state.get('applied_tokens',[])])
+        applied_parts=[st.session_state.get('applied_query','') or '전체 품목',*st.session_state.get('applied_tokens',[])]
+        if st.session_state.get('applied_include_gems'):applied_parts.append('보석 포함')
+        applied=' · '.join(applied_parts)
         applied_slot.html('<div class="applied-query" title="'+escape(applied,quote=True)+'">'+escape(applied)+f' · {len(matched):,}품목</div>')
 
     rows=st.session_state.get('rows',pd.DataFrame())

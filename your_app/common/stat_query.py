@@ -25,3 +25,18 @@ def parse_token(raw):
     return Condition(name,low,high)
 
 def parse_tokens(tokens):return [parse_token(t) for t in tokens if str(t or '').strip()]
+
+def split_gem_markers(fields):
+    """Remove stat-field edge markers and report whether this search includes gems."""
+    tokens = []
+    include_gems = False
+    for field in fields:
+        token = field.strip()
+        if not token:
+            continue
+        condition = token.strip('@').strip()
+        if not condition:
+            raise ValueError('@ 앞이나 뒤에 스탯 조건을 입력해주세요. (예: @도적20)')
+        include_gems |= condition != token
+        tokens.append(condition)
+    return tokens, include_gems
