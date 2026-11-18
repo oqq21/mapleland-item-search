@@ -31,10 +31,18 @@ html, body, [data-testid="stAppViewContainer"] {height:100%;overflow:hidden;}
 .st-key-search_fields [data-testid="stButton"] button {min-height:42px;}
 .st-key-filter_fields {gap:5px!important;padding:4px 0;}
 .filter-label {min-width:44px;font-size:16px;font-weight:700;line-height:38px;white-space:nowrap;}
-.st-key-recent_searches {padding-top:4px;}
+.st-key-recent_searches {max-width:540px;padding-top:4px;}
 .recent-label {font-size:14px;font-weight:700;line-height:1.5;}
-.st-key-workspace .st-key-recent_searches button {min-height:28px;max-width:174px;padding:3px 7px;font-size:13px;}
-.st-key-workspace .st-key-recent_searches button p {font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.st-key-workspace .st-key-recent_grid {
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:5px 6px;
+}
+.st-key-workspace .st-key-recent_grid > div {min-width:0;width:100%;}
+.st-key-workspace .st-key-recent_grid button {height:42px;min-height:42px;width:100%;padding:4px 9px;text-align:left;justify-content:flex-start;}
+.st-key-workspace .st-key-recent_grid button [data-testid="stMarkdownContainer"] {width:100%;min-width:0;}
+.st-key-workspace .st-key-recent_grid button p,
+.st-key-workspace .st-key-recent_grid button strong {white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.st-key-workspace .st-key-recent_grid button p {font-size:12px;line-height:1.25;text-align:left;color:#526074;}
+.st-key-workspace .st-key-recent_grid button strong {display:block;font-size:14px;line-height:1.2;color:#26354a;}
 .st-key-pagination button {min-height:34px;}
 .st-key-workspace > [data-testid="stLayoutWrapper"]:has(> [class*="st-key-results_"]) {flex:1 1 0%!important;height:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
 .st-key-workspace [class*="st-key-results_"] {flex:1 1 0%!important;min-height:0!important;overflow:hidden;}
@@ -50,6 +58,12 @@ html, body, [data-testid="stAppViewContainer"] {height:100%;overflow:hidden;}
 .gem-price-table th,.gem-price-table td {padding:6px 12px;border-bottom:1px solid #dce3ed;text-align:right;}
 .gem-price-table th {background:#edf2fa;font-weight:700;}
 .gem-price-table th:first-child,.gem-price-table td:first-child {text-align:left;}
+@media (min-width:901px) and (max-width:1100px) {
+ .st-key-search_controls [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .st-key-search_fields) {
+  grid-template-columns:minmax(0,510px) minmax(275px,1fr);
+ }
+ .st-key-search_controls [data-testid="stColumn"]:has(.st-key-recent_searches) {grid-column:1/-1;}
+}
 @media(max-width:900px) {
  [data-testid="stMainBlockContainer"] {padding:6px 8px;}
  .app-title {font-size:20px;}

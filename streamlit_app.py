@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from html import escape
 import os
+import re
 import tempfile
 import time
 from pathlib import Path
@@ -21,7 +22,7 @@ from your_app.gui.compact_layout import COMPACT_CSS
 ROOT=Path(__file__).resolve().parent
 CATALOG_PATH=ROOT/'resources/item_catalog.json'
 CATALOG_REVISION=CATALOG_PATH.stat().st_mtime_ns
-APP_BUILD="2026-11-18-search-v12-compact-history"
+APP_BUILD="2026-11-18-search-v13-history-grid"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="collapsed")
 st.html(COMPACT_CSS)
 
@@ -53,6 +54,17 @@ def restore_history(index):
     h=st.session_state.history[index]
     for k in ('query','stat1','stat2','stat3','packet_include_gems'):st.session_state[k]=h[k]
     request_search()
+
+def history_label(entry):
+    name=entry['query'].strip() or '전체 품목'
+    conditions=[entry[key].strip() for key in ('stat1','stat2','stat3') if entry[key].strip()]
+    if entry['packet_include_gems']:
+        conditions.append('보석 포함')
+    detail=' · '.join(conditions)
+    markdown_punctuation=r"([\\\x60*_{}\[\]()<>#+.!|~$])"
+    safe_name=re.sub(markdown_punctuation,r"\\\1",name)
+    safe_detail=re.sub(markdown_punctuation,r"\\\1",detail)
+    return f'**{safe_name}** {safe_detail}'.rstrip(), ' · '.join(filter(None,(name,detail)))
 
 def request_search():
     st.session_state.status_filter='전체'
@@ -150,11 +162,10 @@ with st.container(key='workspace',gap='xxsmall'):
         if st.session_state.history:
             with history_area.container(key='recent_searches',gap='xxsmall'):
                 st.html('<div class="recent-label">최근 검색</div>',width='content')
-                with st.container(horizontal=True,gap='xxsmall'):
+                with st.container(key='recent_grid',horizontal=True,gap='xxsmall'):
                     for i,h in enumerate(st.session_state.history):
-                        label=' · '.join(str(h[k]) for k in ('query','stat1','stat2','stat3') if h[k]) or '전체 검색'
-                        if h['packet_include_gems']:label+=' · 보석 포함'
-                        st.button(label,key=f'history_{i}',help=label,on_click=restore_history,args=(i,))
+                        label,help_text=history_label(h)
+                        st.button(label,key=f'history_{i}',help=help_text,on_click=restore_history,args=(i,),width='stretch')
 
     if st.session_state.get('search_error'):st.error(st.session_state.search_error)
     matched=st.session_state.get('matched',pd.DataFrame())
