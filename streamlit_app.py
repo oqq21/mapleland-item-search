@@ -19,7 +19,7 @@ from your_app.gui.search_table import render_table
 from your_app.gui.compact_layout import COMPACT_CSS
 
 ROOT=Path(__file__).resolve().parent
-APP_BUILD="2026-11-18-search-v11-readability"
+APP_BUILD="2026-11-18-search-v12-compact-history"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="collapsed")
 st.html(COMPACT_CSS)
 
@@ -126,8 +126,8 @@ with st.container(key='workspace',gap='xxsmall'):
             st.caption(APP_BUILD)
 
     with st.container(key='search_controls',gap=None):
-        search_area,filter_area=st.columns([2.2,1],gap='small',vertical_alignment='top',wrap=False)
-        with search_area.container(key='search_fields',gap='xxsmall'):
+        search_area,filter_area,history_area=st.columns([1.15,.85,1.25],gap='small',vertical_alignment='top',wrap=False)
+        with search_area.container(key='search_fields',gap='xxsmall',width=510):
             st.text_input('이름',key='query',placeholder='아이템명 / 도적신발 / 신망토',on_change=request_search)
             fields=st.columns([1,1,1,.55],gap='xsmall',vertical_alignment='bottom',wrap=False)
             fields[0].text_input('스탯1',key='stat1',on_change=request_search)
@@ -138,12 +138,6 @@ with st.container(key='workspace',gap='xxsmall'):
             with st.container(horizontal=True,vertical_alignment='center',gap='xsmall'):
                 st.html('<div class="filter-label">거래</div>',width='content')
                 status_filter=st.segmented_control('거래 상태',['전체','판매완료'],key='status_filter',required=True,label_visibility='collapsed')
-                with st.popover('최근 검색',key='recent_searches'):
-                    if not st.session_state.history:st.caption('최근 검색이 없습니다.')
-                    for i,h in enumerate(st.session_state.history):
-                        label=' · '.join(str(h[k]) for k in ('query','stat1','stat2','stat3') if h[k]) or '전체 검색'
-                        if h['packet_include_gems']:label+=' · 보석 포함'
-                        st.button(label,key=f'history_{i}',on_click=restore_history,args=(i,),width='stretch')
             with st.container(horizontal=True,vertical_alignment='center',gap='xsmall'):
                 st.html('<div class="filter-label">보석</div>',width='content')
                 gem_filter=st.segmented_control('보석 장착',['전체','유보석','무보석'],key='gem_filter',required=True,label_visibility='collapsed')
@@ -151,6 +145,14 @@ with st.container(key='workspace',gap='xxsmall'):
                 st.toggle('보석 포함 검색',key='packet_include_gems',on_change=request_search,help='검색 조건에만 보석을 더합니다. 본체 숫자와 보석은 나누어 표시합니다.')
                 external_slot=st.empty()
             applied_slot=st.empty()
+        if st.session_state.history:
+            with history_area.container(key='recent_searches',gap='xxsmall'):
+                st.html('<div class="recent-label">최근 검색</div>',width='content')
+                with st.container(horizontal=True,gap='xxsmall'):
+                    for i,h in enumerate(st.session_state.history):
+                        label=' · '.join(str(h[k]) for k in ('query','stat1','stat2','stat3') if h[k]) or '전체 검색'
+                        if h['packet_include_gems']:label+=' · 보석 포함'
+                        st.button(label,key=f'history_{i}',help=label,on_click=restore_history,args=(i,))
 
     if st.session_state.get('search_error'):st.error(st.session_state.search_error)
     matched=st.session_state.get('matched',pd.DataFrame())

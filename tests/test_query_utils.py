@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import unittest
+from pathlib import Path
 
 import pandas as pd
 
@@ -75,6 +77,17 @@ class QueryBoundaryTests(unittest.TestCase):
             ].tolist(),
             ["흑 견랑포(여)"],
         )
+
+    def test_deployed_catalog_supports_wolf_robe_gender_queries(self):
+        catalog = Path(__file__).resolve().parents[1] / "resources" / "item_catalog.json"
+        items = pd.DataFrame(json.loads(catalog.read_text(encoding="utf-8")))
+        for query, expected_codes in (
+            ("견랑포남", {1050092, 1050093, 1050094, 1050095}),
+            ("견랑포여", {1051094, 1051095, 1051096, 1051097}),
+            ("흑견랑포(남)", {1050095}),
+        ):
+            with self.subTest(query=query):
+                self.assertEqual(set(items.loc[mask_for_item_query(items, query), "itemCode"]), expected_codes)
 
     def test_category_aliases_select_the_whole_item_sheet(self):
         items = pd.DataFrame({
