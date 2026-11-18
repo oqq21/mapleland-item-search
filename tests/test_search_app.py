@@ -33,7 +33,8 @@ def test_search_history_pagination_and_no_market_api(tmp_path,monkeypatch):
         assert not app.exception
     search('공116')
     assert len(app.session_state['rows'])==105
-    assert len(app.sidebar.button)==1 and app.sidebar.button[0].key=='history_0'
+    assert not app.sidebar.button
+    assert app.button(key='history_0').label.endswith('공116')
     next(b for b in app.button if b.label=='다음').click().run()
     assert app.session_state['page']==2
     search('공117')

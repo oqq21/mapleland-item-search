@@ -68,7 +68,7 @@ def test_each_stat_sum_and_work_direction(token,fields,expected):
 
 def test_optional_grade_and_useless_gem_do_not_invalidate_valid_armor():
     result=evaluate_gems(row(option_codes='26008,26011,16006',unit_price=200_000_000),{})
-    assert result['gem_valid'] and '#8A4B08' in result['gem_html']
+    assert result['gem_valid'] and '(HP<b class="gem-lower">20</b>)' in result['gem_html']
     useless=evaluate_gems(row(option_codes='26008,26011,26010',unit_price=200_000_000),{'26010':99_000_000})
     assert useless['gem_valid'] and useless['recognized_gem_cost']==6_750_000
 
@@ -77,6 +77,10 @@ def test_gem_excluded_price_is_full_cost_and_may_be_negative():
     view=packet_view(pd.DataFrame([row(option_codes='26008,26011',unit_price=1_000_000)]),prices={'26008':2_000_000,'26011':1_000_000})
     assert view.iloc[0]['인정보석원가(만)']==975
     assert view.iloc[0]['보석제외가(만)']==-875
+    html=render_table(view)
+    assert 'gem-cell gem-white' in html
+    assert 'gem-price-warning gem-difference-warning' in html
+    assert '방어구 보석 비중 80% 이상' in html
 
 
 @pytest.mark.parametrize('mesos,expected',[(0,0),(4999,0),(5000,1),(14999,1),(15000,2),(1005000,101),(-4999,0),(-5000,-1),(-15000,-2)])

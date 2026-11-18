@@ -238,6 +238,7 @@ def packet_view(frame,include_gems=False,prices=None,context=''):
         fast=completed and pd.notna(seconds) and number(seconds)<=120
         state='판매완료' if completed else '만료' if pd.notna(expiry) and expiry<=now else '판매중'
         price=number(row.get('unit_price'));cost=gems['recognized_gem_cost']
+        body_price=price_in_man(price-cost)
         stats=format_stat_text(row);stats_html=escape(stats)
         upgrade=number(row.get('total_upgrade_left'));work=number(row.get('total_work_count'))
         if upgrade>0:
@@ -251,7 +252,8 @@ def packet_view(frame,include_gems=False,prices=None,context=''):
         name=str(row.get('itemName',''))+(f' {work}작' if work>0 else '')
         records.append({'상태':state,'시간':format_packet_time(row),'판매소요':format_sale_duration(row),'아이템':name,
             '총스탯':stats,'_총스탯HTML':stats_html,
-            '판매가(만)':price_in_man(price),'보석제외가(만)':price_in_man(price-cost),'보석':gems['gem_text'],'인정보석원가(만)':price_in_man(cost),
+            '판매가(만)':price_in_man(price),'보석제외가(만)':body_price,'보석':gems['gem_text'],'인정보석원가(만)':price_in_man(cost),
+            '_보석가격경고':gems['gem_ratio_warning'],'_차액경고':gems['has_gems'] and body_price<=0,
             '무효 사유':gems['invalid_reasons'],
             '_아이템색':color_key(color_score(row)),'_예상색':predicted_color(row),'_보석HTML':gems['gem_html'],'_보석셀':gems['gem_cell_style'],'_빠른판매':fast,'_시간설명':str(row.get('_time_reason','')),'_code':number(row.get('itemCode'))})
     return pd.DataFrame(records)

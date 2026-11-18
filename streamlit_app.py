@@ -19,8 +19,8 @@ from your_app.gui.search_table import render_table
 from your_app.gui.compact_layout import COMPACT_CSS
 
 ROOT=Path(__file__).resolve().parent
-APP_BUILD="2026-11-13-search-v10-own-data"
-st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="expanded")
+APP_BUILD="2026-11-18-search-v11-readability"
+st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="collapsed")
 st.html(COMPACT_CSS)
 
 @st.cache_resource
@@ -100,18 +100,15 @@ def show_gem_prices():
     st.caption('보석 재료값 기준 · 단위: 만 메소')
 
 
-with st.sidebar:
-    st.markdown('**최근 검색**')
-    if not st.session_state.history:st.caption('최근 9개 검색이 남아요.')
-    for i,h in enumerate(st.session_state.history):
-        label=' · '.join(str(h[k]) for k in ('query','stat1','stat2','stat3') if h[k]) or '전체 검색'
-        if h['packet_include_gems']:label+=' · 보석 포함'
-        st.button(label,key=f'history_{i}',help=label,on_click=restore_history,args=(i,),width='stretch')
-
-
 with st.container(key='workspace',gap='xxsmall'):
-    with st.container(key='toolbar',horizontal=True,wrap=False,vertical_alignment='center',gap='xsmall'):
-        st.html('<div class="app-title">메랜 아이템검색</div>',width=220)
+    with st.container(key='toolbar',horizontal=True,vertical_alignment='center',gap='xsmall'):
+        st.html('<div class="app-title">메랜 아이템검색</div>',width='content')
+        with st.popover('최근 검색',key='recent_searches'):
+            if not st.session_state.history:st.caption('최근 검색이 없습니다.')
+            for i,h in enumerate(st.session_state.history):
+                label=' · '.join(str(h[k]) for k in ('query','stat1','stat2','stat3') if h[k]) or '전체 검색'
+                if h['packet_include_gems']:label+=' · 보석 포함'
+                st.button(label,key=f'history_{i}',on_click=restore_history,args=(i,),width='stretch')
         with st.popover('기본옵'):
             matched=st.session_state.get('matched',pd.DataFrame())
             if matched.empty:st.caption('검색 후 일치 품목의 기본옵을 볼 수 있어요.')
@@ -126,39 +123,40 @@ with st.container(key='workspace',gap='xxsmall'):
             st.write('줄임말: 명·이·전·궁·도·단. 작 방향은 항상 보석 제외 추가치입니다.')
             st.write('법사=인트+럭+마력. 마·인·인트=합마. 법신=추가 인트+럭+마력.')
             st.write('노작=남은 업횟이 기본 업횟과 같음. 완작·업6·작5도 검색할 수 있습니다.')
-            st.write('필수 상급: 파랑·굵게 / 보조 상급: 보라 / 무효옵: 회색 / 상급 미만: 황갈색')
-            st.write('확인된 2분 이하 판매만 빨강. 판매소요가 미확인이면 마우스를 올려 사유를 볼 수 있습니다.')
+            st.write('보석 옵션명은 필수 파랑, 보조 초록, 그 외 회색입니다. 상급 숫자는 파랑, 중·하급 숫자는 빨강입니다.')
+            st.write('보석 누락·등급 미달·리버스 무보석은 보석 칸에 빨간 배경을 표시합니다. 보석 비중이 높으면 가격에 빨간 글씨를 표시합니다.')
+            st.write('확인된 2분 이하 판매는 행 배경이 빨강입니다. 판매소요가 미확인이면 마우스를 올려 사유를 볼 수 있습니다.')
             st.write('완료와 연결된 매물은 판매중 수집시각으로 정렬합니다. 새 검색·기록 선택은 목록 맨 위부터 시작합니다.')
             st.write('외부 검색페이지는 메랜지지가 지원하는 조건 범위로 열립니다.')
             st.caption('자료 갱신 시각: '+snapshot.updated_at+' · GitHub 읽기 전용')
             st.caption(APP_BUILD)
-        st.html('<div class="app-meta">본체 총스탯 / 보석 분리 · '+APP_BUILD+'</div>')
 
-    search_area,filter_area=st.columns([3.4,4.6],vertical_alignment='top',wrap=False)
-    with search_area.container(key='search_fields',gap='xxsmall'):
-        st.text_input('이름',key='query',placeholder='아이템명 / 도적신발 / 신망토',on_change=request_search)
-        fields=st.columns([1,1,1,.75],vertical_alignment='bottom',wrap=False)
-        fields[0].text_input('스탯1',key='stat1',on_change=request_search)
-        fields[1].text_input('스탯2',key='stat2',on_change=request_search)
-        fields[2].text_input('스탯3',key='stat3',on_change=request_search)
-        fields[3].button('검색',type='primary',width='stretch',on_click=request_search)
-    with filter_area.container(key='filter_fields',gap='xxsmall'):
-        trade=st.columns([.5,4],vertical_alignment='center',wrap=False)
-        trade[0].html('<div class="filter-label">거래</div>')
-        status_filter=trade[1].segmented_control('거래 상태',['전체','판매완료'],key='status_filter',required=True,label_visibility='collapsed')
-        gem=st.columns([.5,4],vertical_alignment='center',wrap=False)
-        gem[0].html('<div class="filter-label">보석</div>')
-        gem_filter=gem[1].segmented_control('보석 장착',['전체','유보석','무보석'],key='gem_filter',required=True,label_visibility='collapsed')
-        options=st.columns([1.6,1.3,2],vertical_alignment='center',wrap=False)
-        options[0].toggle('보석 포함 검색',key='packet_include_gems',on_change=request_search,help='검색 조건에만 보석을 더합니다. 본체 숫자와 보석은 나누어 표시합니다.')
-        external_slot=options[1].empty()
-        applied_slot=options[2].empty()
+    with st.container(key='search_controls',gap=None):
+        search_area,filter_area=st.columns([2.2,1],gap='small',vertical_alignment='top',wrap=False)
+        with search_area.container(key='search_fields',gap='xxsmall'):
+            st.text_input('이름',key='query',placeholder='아이템명 / 도적신발 / 신망토',on_change=request_search)
+            fields=st.columns([1,1,1,.55],gap='xsmall',vertical_alignment='bottom',wrap=False)
+            fields[0].text_input('스탯1',key='stat1',on_change=request_search)
+            fields[1].text_input('스탯2',key='stat2',on_change=request_search)
+            fields[2].text_input('스탯3',key='stat3',on_change=request_search)
+            fields[3].button('검색',type='primary',width='stretch',on_click=request_search)
+        with filter_area.container(key='filter_fields',gap='xxsmall'):
+            with st.container(horizontal=True,vertical_alignment='center',gap='xsmall'):
+                st.html('<div class="filter-label">거래</div>',width='content')
+                status_filter=st.segmented_control('거래 상태',['전체','판매완료'],key='status_filter',required=True,label_visibility='collapsed')
+            with st.container(horizontal=True,vertical_alignment='center',gap='xsmall'):
+                st.html('<div class="filter-label">보석</div>',width='content')
+                gem_filter=st.segmented_control('보석 장착',['전체','유보석','무보석'],key='gem_filter',required=True,label_visibility='collapsed')
+            with st.container(horizontal=True,vertical_alignment='center',gap='xsmall'):
+                st.toggle('보석 포함 검색',key='packet_include_gems',on_change=request_search,help='검색 조건에만 보석을 더합니다. 본체 숫자와 보석은 나누어 표시합니다.')
+                external_slot=st.empty()
+            applied_slot=st.empty()
 
     if st.session_state.get('search_error'):st.error(st.session_state.search_error)
     matched=st.session_state.get('matched',pd.DataFrame())
     if not matched.empty:
         link=search_page_url(matched,st.session_state.get('applied_tokens',[]))
-        if link:external_slot.link_button('검색페이지 열기',link,width='stretch')
+        if link:external_slot.link_button('검색페이지 열기',link)
         applied=' · '.join([st.session_state.get('applied_query','') or '전체 품목',*st.session_state.get('applied_tokens',[])])
         applied_slot.html('<div class="applied-query" title="'+escape(applied,quote=True)+'">'+escape(applied)+f' · {len(matched):,}품목</div>')
 
@@ -170,11 +168,11 @@ with st.container(key='workspace',gap='xxsmall'):
             st.session_state.page=1;st.session_state.generation+=1;st.session_state.filter_signature=signature
         count=len(visible);pages=max(1,(count+99)//100)
         st.session_state.page=min(st.session_state.page,pages)
-        nav=st.columns([.65,.65,8],vertical_alignment='center',wrap=False)
-        if nav[0].button('이전',disabled=st.session_state.page<=1):st.session_state.page-=1;st.rerun()
-        if nav[1].button('다음',disabled=st.session_state.page>=pages):st.session_state.page+=1;st.rerun()
         elapsed='1초 미만' if st.session_state.elapsed<1 else f'{round(st.session_state.elapsed)}초'
-        nav[2].caption(f'{count:,}건 · {st.session_state.page}/{pages}페이지 · 중복제외 {st.session_state.duplicates:,}건 · 검색 {elapsed}')
+        with st.container(key='pagination',horizontal=True,vertical_alignment='center',gap='xsmall'):
+            if st.button('이전',disabled=st.session_state.page<=1):st.session_state.page-=1;st.rerun()
+            if st.button('다음',disabled=st.session_state.page>=pages):st.session_state.page+=1;st.rerun()
+            st.caption(f'{count:,}건 · {st.session_state.page}/{pages}페이지 · 중복제외 {st.session_state.duplicates:,}건 · 검색 {elapsed}')
         start=(st.session_state.page-1)*100
         context=context_for_query(st.session_state.get('applied_query',''))
         if any(c.name=='단도' for c in parse_tokens(st.session_state.get('applied_tokens',[]))):context='섀도어'

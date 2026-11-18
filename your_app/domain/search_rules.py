@@ -12,7 +12,8 @@ SUFFIXES = ('PAD','MAD','ACC','EVA','SPEED','JUMP','HP','MP','STR','INT','LUK','
 GEM_VALUES = ((1,2,3),(1,2,3),(2,3,5),(2,3,5),(2,3,5),(1,2,3),(10,20,30),(10,20,30),(2,3,5),(2,3,5),(2,3,5),(1,3,5))
 WEAPONS = {'한손검','한손도끼','한손둔기','두손검','두손도끼','두손둔기','창','폴암','단검','아대','활','석궁','완드','스태프','너클','총'}
 ARMOR = {'신발','장갑','전신','상의','하의','모자','방패'}
-COLORS = {'required':'#174EA6','optional':'#7030A0','invalid':'#595959','lower':'#8A4B08'}
+GEM_COLORS = {'required':'#0052cc','optional':'#006b3c','invalid':'#6b7280'}
+GEM_ERROR_COLORS = {'required':'#00235f','optional':'#00351e','invalid':'#302b33'}
 NAME_COLORS = {'gray':'#595959','white':'#202733','blue':'#1677ff','purple':'#9333ea','yellow':'#a77800','lime':'#368b11','red':'#d41f46'}
 
 def number(value, default=0):
@@ -84,27 +85,42 @@ def evaluate_gems(row: Mapping, prices: Mapping, context='') -> dict:
     cost=sum(number(prices.get(str(g.code),prices.get(g.code,0))) for g in recognized)
     if recognized and not reverse:
         cost += 2_250_000 + sum((750_000,1_500_000,2_250_000)[g.grade] for g in recognized)
-    reasons=[]
-    if reverse and not gems: reasons.append('리버스 무보석')
+    price=number(row.get('unit_price'))
+    weapon=sheet in WEAPONS
+    physical_weapon=weapon and sheet not in {'완드','스태프'}
+    attack_only=physical_weapon and price<=100_000_000
+    effective_required={'PAD'} if attack_only else required
+    upper_required=effective_required if price>=100_000_000 or attack_only else frozenset()
+    option_reasons=[]
+    if reverse and not gems: option_reasons.append('리버스 무보석')
     if gems and applicable:
-        present={g.stat for g in gems}
-        missing=required-present
-        if missing: reasons.append('필수 누락: '+ '·'.join(LABELS[s] for s in STATS if s in missing))
-        high_required=sheet in WEAPONS or number(row.get('unit_price'))-cost >= 100_000_000
-        lower={g.stat for g in gems if g.stat in required and g.grade<2}
-        if high_required and lower: reasons.append('필수 상급 부족: '+'·'.join(LABELS[s] for s in STATS if s in lower))
-        if sheet in WEAPONS and number(row.get('unit_price'))>0 and cost*10 >= number(row.get('unit_price'))*6:
-            reasons.append('무기 보석 비중 60% 이상')
+        missing=effective_required-{g.stat for g in gems}
+        lower={g.stat for g in gems if g.stat in upper_required and g.grade<2}
+        if missing: option_reasons.append('필수 누락: '+'·'.join(LABELS[s] for s in STATS if s in missing))
+        if lower: option_reasons.append('필수 상급 부족: '+'·'.join(LABELS[s] for s in STATS if s in lower))
+    ratio_reason=''
+    if gems and price>0:
+        if weapon and cost*10>=price*6: ratio_reason='무기 보석 비중 60% 이상'
+        if sheet in ARMOR and cost*5>=price*4: ratio_reason='방어구 보석 비중 80% 이상'
+    perfect=len(gems)==len(recognized)==3 and all(g.grade==2 for g in gems)
+    cell_style='red' if option_reasons else 'green' if perfect else 'white'
+    colors=GEM_ERROR_COLORS if option_reasons else GEM_COLORS
     spans=[]
-    for g in gems:
-        kind='required' if g.stat in required else 'optional' if g.stat in optional else 'invalid'
-        color=COLORS['lower'] if kind!='invalid' and g.grade<2 else COLORS[kind]
-        label=LABELS[g.stat]+'+'+str(g.value)
-        spans.append(f'<span style="color:{color};font-weight:{800 if kind=="required" else 500}" title="{("하급","중급","상급")[g.grade]}">{html.escape(label)}</span>')
+    roles={'required':0,'optional':1,'invalid':2}
+    tokens=[('required' if g.stat in required else 'optional' if g.stat in optional else 'invalid',g) for g in gems]
+    for kind,g in sorted(tokens,key=lambda pair:roles[pair[0]]):
+        grade=('하급','중급','상급')[g.grade]
+        label=html.escape(LABELS[g.stat])
+        grade_class='gem-upper' if g.grade==2 else 'gem-lower'
+        value=f'<b class="{grade_class}">{g.value}</b>'
+        token=f'{label}{value}'
+        if g.grade<2 or kind=='invalid': token=f'({token})'
+        spans.append(f'<span class="gem-token" style="color:{colors[kind]}" title="{grade}">{token}</span>')
+    reasons=option_reasons+[ratio_reason] if ratio_reason else option_reasons
     return {'has_gems':bool(gems),'recognized_gem_cost':cost,'gem_html':' / '.join(spans),
             'gem_text':' / '.join(LABELS[g.stat]+'+'+str(g.value) for g in gems),
             'invalid_reasons':' / '.join(reasons),'gem_valid':not reasons,
-            'gem_cell_style':'red' if reasons else 'green' if len(gems)==3 and all(g.grade==2 for g in gems) else 'white'}
+            'gem_cell_style':cell_style,'gem_ratio_warning':bool(ratio_reason)}
 
 def additional_sum(row: Mapping) -> int:
     return sum(number(row.get('add_'+s)) for s in STATS if s not in {'HP','MP'}) + int(number(row.get('add_HP'))/10) + int(number(row.get('add_MP'))/10)

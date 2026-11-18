@@ -56,24 +56,33 @@ def test_recognized_cost_excludes_useless_gem_and_includes_only_its_fees():
     result=evaluate_gems(row(option_codes='26008,26011,26010'),prices)
     assert result['recognized_gem_cost']==9_750_000
     assert result['gem_valid']
-    assert '#595959' in result['gem_html']
+    assert '#6b7280' in result['gem_html']
+    assert result['gem_cell_style']=='white'
 
 def test_all_useless_gems_mean_no_common_fee():
     r=evaluate_gems(row(option_codes='26010'),{'26010':50_000_000})
     assert r['recognized_gem_cost']==0 and '필수 누락' in r['invalid_reasons']
 
-def test_armor_grade_boundary_uses_actual_listing_minus_full_cost():
-    r=row(option_codes='16008,16011',unit_price=105_250_000)
-    # 225 + 150 + 150 = 525만, materials zero. Exactly 1억 requires upper.
-    assert '상급 부족' in evaluate_gems(r,{})['invalid_reasons']
+def test_armor_grade_boundary_uses_actual_listing_price():
+    r=row(option_codes='16008,16011',unit_price=100_000_000)
+    assert evaluate_gems(r,{})['gem_cell_style']=='red'
     r['unit_price']-=1
     assert evaluate_gems(r,{})['gem_valid']
+
+def test_weapon_grade_warning_checks_attack3_and_the_magic_exception():
+    weapon=row(sheet='활',option_codes='26000',unit_price=100_000_000)
+    assert evaluate_gems(weapon,{})['gem_cell_style']=='white'
+    assert '필수 누락' in evaluate_gems({**weapon,'unit_price':100_000_001},{})['invalid_reasons']
+    assert '상급 부족' in evaluate_gems({**weapon,'option_codes':'16000'},{})['invalid_reasons']
+    wand=row(sheet='완드',option_codes='16001,16009',unit_price=99_999_999)
+    assert evaluate_gems(wand,{})['gem_cell_style']=='white'
 
 def test_weapon_sixty_percent_boundary_and_mage_luk_optional():
     r=row(sheet='완드',직업='법사',option_codes='26001,26009,26003',unit_price=20_000_000)
     prices={'26001':1_000_000,'26009':1_000_000,'26003':1_000_000}
     assert evaluate_gems(r,prices)['recognized_gem_cost']==12_000_000
-    assert '60%' in evaluate_gems(r,prices)['invalid_reasons']
+    result=evaluate_gems(r,prices)
+    assert '60%' in result['invalid_reasons'] and result['gem_cell_style']=='green'
     r['unit_price']+=1
     assert evaluate_gems(r,prices)['gem_valid']
 
@@ -97,7 +106,7 @@ def test_search_display_total_stats_gems_separate_and_hidden_stats_count():
     r.update(option_codes='16011',gem_DEX=3,total_DEX=10)
     f=packet_view(pd.DataFrame([r]),True,prices={'16011':100})
     assert '덱10' in f.iloc[0]['총스탯'] and '덱13' not in f.iloc[0]['총스탯']
-    assert '[' not in f.iloc[0]['총스탯'] and '#8A4B08' in f.iloc[0]['_보석HTML']
+    assert '[' not in f.iloc[0]['총스탯'] and '(덱<b class="gem-lower">3</b>)' in f.iloc[0]['_보석HTML']
 
 def test_time_crosses_midnight_with_both_one_and_three_day_listings():
     a=pd.DataFrame([row(captured_at='2026-11-09 23:59:45',internal_time='2026-11-12 23:59:40')])
@@ -131,7 +140,7 @@ def test_html_escapes_packet_text_and_preserves_gem_colors():
     view=packet_view(pd.DataFrame([row(itemName='<script>alert(1)</script>',option_codes='26008,16011,26010')]))
     text=render_table(view)
     assert '<script>' not in text and '&lt;script&gt;' in text
-    assert '#174EA6' in text and '#8A4B08' in text and '#595959' in text
+    assert 'gem-upper">5</b>' in text and 'gem-lower">3</b>' in text and '#302b33' in text
 
 def test_external_search_is_a_plain_link():
     f=pd.DataFrame([{'itemCode':1452000,'sheet':'활'}])
