@@ -19,22 +19,24 @@ from your_app.gui.search_table import render_table
 from your_app.gui.compact_layout import COMPACT_CSS
 
 ROOT=Path(__file__).resolve().parent
+CATALOG_PATH=ROOT/'resources/item_catalog.json'
+CATALOG_REVISION=CATALOG_PATH.stat().st_mtime_ns
 APP_BUILD="2026-11-18-search-v12-compact-history"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="collapsed")
 st.html(COMPACT_CSS)
 
 @st.cache_resource
-def load_catalog():
-    records=json.loads((ROOT/'resources/item_catalog.json').read_text(encoding='utf-8'))
+def load_catalog(catalog_revision):
+    records=json.loads(CATALOG_PATH.read_text(encoding='utf-8'))
     frame=pd.DataFrame(records).astype('object').fillna('');_ensure_cache_columns(frame)
     return frame,{int(r['itemCode']):r for r in records}
 
 @st.cache_data(max_entries=3,show_spinner=False)
-def run_search(directory,version,codes,tokens,include_gems):
-    _,catalog=load_catalog()
+def run_search(directory,version,catalog_revision,codes,tokens,include_gems):
+    _,catalog=load_catalog(catalog_revision)
     return search_packet_data(Path(directory)/'packet_active.parquet',Path(directory)/'packet_completed.parquet',codes,list(tokens),include_gems,catalog)
 
-items,catalog=load_catalog()
+items,catalog=load_catalog(CATALOG_REVISION)
 try:
     cache=Path(os.environ.get('PP213_DATA_CACHE_DIR',str(Path(tempfile.gettempdir())/'mapleland-item-search-own-data')))
     snapshot=ensure_data_snapshot(cache,check_interval=3600)
@@ -75,7 +77,7 @@ if st.session_state.request_search:
         started=time.perf_counter()
         with search_feedback.container():
             with st.spinner('조건에 맞는 매물을 찾는 중…'):
-                rows,duplicates=run_search(str(snapshot.directory.resolve()),f'{snapshot.version}:{APP_BUILD}',codes,tuple(tokens),st.session_state.packet_include_gems)
+                rows,duplicates=run_search(str(snapshot.directory.resolve()),f'{snapshot.version}:{APP_BUILD}',CATALOG_REVISION,codes,tuple(tokens),st.session_state.packet_include_gems)
         st.session_state.rows=rows;st.session_state.duplicates=duplicates
         st.session_state.matched=matched;st.session_state.applied_query=query;st.session_state.applied_tokens=tokens
         st.session_state.elapsed=time.perf_counter()-started
@@ -126,8 +128,8 @@ with st.container(key='workspace',gap='xxsmall'):
             st.caption(APP_BUILD)
 
     with st.container(key='search_controls',gap=None):
-        search_area,filter_area,history_area=st.columns([1.15,.85,1.25],gap='small',vertical_alignment='top',wrap=False)
-        with search_area.container(key='search_fields',gap='xxsmall',width=510):
+        search_area,filter_area,history_area=st.columns(3,gap='small',vertical_alignment='top',wrap=False)
+        with search_area.container(key='search_fields',gap='xxsmall'):
             st.text_input('이름',key='query',placeholder='아이템명 / 도적신발 / 신망토',on_change=request_search)
             fields=st.columns([1,1,1,.55],gap='xsmall',vertical_alignment='bottom',wrap=False)
             fields[0].text_input('스탯1',key='stat1',on_change=request_search)

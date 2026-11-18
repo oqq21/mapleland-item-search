@@ -19,8 +19,15 @@ html, body, [data-testid="stAppViewContainer"] {height:100%;overflow:hidden;}
 .st-key-workspace [data-testid="stMarkdownContainer"] p {margin:0;}
 .app-title {font-size:23px;font-weight:750;line-height:38px;margin-right:12px;white-space:nowrap;color:#26354a;}
 .applied-query {font-size:14px;line-height:1.4;color:#526074;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.st-key-search_controls [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .st-key-search_fields) {
+ display:grid;grid-template-columns:minmax(0,510px) minmax(275px,320px) minmax(210px,1fr);gap:14px;
+}
 .st-key-search_fields {gap:5px!important;border:1px solid #dbe2ec;border-radius:8px;padding:9px 12px;background:#f8faff;}
-.st-key-search_fields [data-testid="stHorizontalBlock"] {align-items:flex-end;}
+.st-key-search_fields [data-testid="stHorizontalBlock"] {
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) minmax(68px,.65fr);align-items:end;gap:8px;
+}
+.st-key-search_controls [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .st-key-search_fields) > [data-testid="stColumn"],
+.st-key-search_fields [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {width:100%;min-width:0;}
 .st-key-search_fields [data-testid="stButton"] button {min-height:42px;}
 .st-key-filter_fields {gap:5px!important;padding:4px 0;}
 .filter-label {min-width:44px;font-size:16px;font-weight:700;line-height:38px;white-space:nowrap;}
@@ -47,8 +54,8 @@ html, body, [data-testid="stAppViewContainer"] {height:100%;overflow:hidden;}
  [data-testid="stMainBlockContainer"] {padding:6px 8px;}
  .app-title {font-size:20px;}
  .st-key-workspace button {padding:5px 9px;}
- .st-key-search_controls [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .st-key-search_fields) {flex-direction:column;}
- .st-key-search_controls [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .st-key-search_fields) > [data-testid="stColumn"] {width:100%!important;flex:0 0 auto!important;}
+ .st-key-search_controls [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .st-key-search_fields) {grid-template-columns:minmax(0,1fr);gap:7px;}
+ .st-key-search_fields {max-width:510px;}
  .st-key-filter_fields {display:flex;flex-flow:row wrap;column-gap:12px!important;}
  .st-key-filter_fields > [data-testid="stLayoutWrapper"] {width:auto;}
  .st-key-filter_fields > [data-testid="stElementContainer"]:has(.applied-query) {flex-basis:100%;}
