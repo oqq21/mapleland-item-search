@@ -103,12 +103,6 @@ def show_gem_prices():
 with st.container(key='workspace',gap='xxsmall'):
     with st.container(key='toolbar',horizontal=True,vertical_alignment='center',gap='xsmall'):
         st.html('<div class="app-title">메랜 아이템검색</div>',width='content')
-        with st.popover('최근 검색',key='recent_searches'):
-            if not st.session_state.history:st.caption('최근 검색이 없습니다.')
-            for i,h in enumerate(st.session_state.history):
-                label=' · '.join(str(h[k]) for k in ('query','stat1','stat2','stat3') if h[k]) or '전체 검색'
-                if h['packet_include_gems']:label+=' · 보석 포함'
-                st.button(label,key=f'history_{i}',on_click=restore_history,args=(i,),width='stretch')
         with st.popover('기본옵'):
             matched=st.session_state.get('matched',pd.DataFrame())
             if matched.empty:st.caption('검색 후 일치 품목의 기본옵을 볼 수 있어요.')
@@ -144,6 +138,12 @@ with st.container(key='workspace',gap='xxsmall'):
             with st.container(horizontal=True,vertical_alignment='center',gap='xsmall'):
                 st.html('<div class="filter-label">거래</div>',width='content')
                 status_filter=st.segmented_control('거래 상태',['전체','판매완료'],key='status_filter',required=True,label_visibility='collapsed')
+                with st.popover('최근 검색',key='recent_searches'):
+                    if not st.session_state.history:st.caption('최근 검색이 없습니다.')
+                    for i,h in enumerate(st.session_state.history):
+                        label=' · '.join(str(h[k]) for k in ('query','stat1','stat2','stat3') if h[k]) or '전체 검색'
+                        if h['packet_include_gems']:label+=' · 보석 포함'
+                        st.button(label,key=f'history_{i}',on_click=restore_history,args=(i,),width='stretch')
             with st.container(horizontal=True,vertical_alignment='center',gap='xsmall'):
                 st.html('<div class="filter-label">보석</div>',width='content')
                 gem_filter=st.segmented_control('보석 장착',['전체','유보석','무보석'],key='gem_filter',required=True,label_visibility='collapsed')

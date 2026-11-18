@@ -24,6 +24,8 @@ html, body, [data-testid="stAppViewContainer"] {height:100%;overflow:hidden;}
 .st-key-search_fields [data-testid="stButton"] button {min-height:42px;}
 .st-key-filter_fields {gap:5px!important;padding:4px 0;}
 .filter-label {min-width:44px;font-size:16px;font-weight:700;line-height:38px;white-space:nowrap;}
+.st-key-workspace .st-key-recent_searches button {min-height:30px;padding:3px 8px;font-size:13px;}
+.st-key-workspace .st-key-recent_searches button p {font-size:13px;}
 .st-key-pagination button {min-height:34px;}
 .st-key-workspace > [data-testid="stLayoutWrapper"]:has(> [class*="st-key-results_"]) {flex:1 1 0%!important;height:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
 .st-key-workspace [class*="st-key-results_"] {flex:1 1 0%!important;min-height:0!important;overflow:hidden;}
