@@ -9,9 +9,9 @@ import time
 from pathlib import Path
 import pandas as pd
 import streamlit as st
-from your_app.common.remote_data import ensure_data_snapshot
+from your_app.common.remote_data import get_search_snapshot
 from your_app.common.query_utils import mask_for_item_query, _ensure_cache_columns
-from your_app.common.stat_query import parse_tokens, split_gem_markers
+from your_app.common.stat_query import parse_tokens, split_search_markers
 from your_app.common.display_format import price_in_man
 from your_app.common.site_links import search_page_url
 from your_app.domain.search_rules import context_for_query, number
@@ -22,9 +22,10 @@ from your_app.gui.compact_layout import COMPACT_CSS
 ROOT=Path(__file__).resolve().parent
 CATALOG_PATH=ROOT/'resources/item_catalog.json'
 CATALOG_REVISION=CATALOG_PATH.stat().st_mtime_ns
-APP_BUILD="2026-11-19-search-v15-icarus"
+APP_BUILD="2026-11-19-search-v16-quick-input"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="collapsed")
 st.html(COMPACT_CSS)
+st.html('<script>'+(ROOT/'your_app/gui/korean_input.js').read_text(encoding='utf-8')+'</script>',unsafe_allow_javascript=True)
 
 @st.cache_resource
 def load_catalog(catalog_revision):
@@ -40,7 +41,7 @@ def run_search(directory,version,catalog_revision,codes,tokens,include_gems):
 items,catalog=load_catalog(CATALOG_REVISION)
 try:
     cache=Path(os.environ.get('PP213_DATA_CACHE_DIR',str(Path(tempfile.gettempdir())/'mapleland-item-search-own-data')))
-    snapshot=ensure_data_snapshot(cache,check_interval=3600)
+    snapshot=get_search_snapshot(cache,refresh=st.session_state.get('request_search',False),check_interval=3600)
     prices=json.loads(snapshot.path('gem_prices.json').read_text(encoding='utf-8'))
 except Exception as exc:
     st.error(f'검색 자료를 열지 못했습니다: {exc}');st.stop()
@@ -67,8 +68,6 @@ def history_label(entry):
     return f'**{safe_name}** {safe_detail}'.rstrip(), ' · '.join(filter(None,(name,detail)))
 
 def request_search():
-    st.session_state.status_filter='전체'
-    st.session_state.gem_filter='전체'
     st.session_state.request_search=True
 
 # Keep the workspace at the same delta path during input blur searches.
@@ -76,11 +75,12 @@ def request_search():
 search_feedback=st.empty()
 if st.session_state.request_search:
     st.session_state.request_search=False
-    query=st.session_state.query.strip()
     try:
-        tokens, gem_marker=split_gem_markers(st.session_state[k] for k in ('stat1','stat2','stat3'))
+        query,tokens,markers=split_search_markers(st.session_state.query,(st.session_state[k] for k in ('stat1','stat2','stat3')))
         conditions=parse_tokens(tokens)
-        include_gems=gem_marker or st.session_state.packet_include_gems
+        without_gems='#' in markers
+        completed_only='$' in markers
+        include_gems=not without_gems and ('@' in markers or st.session_state.packet_include_gems)
         if not query and not tokens:raise ValueError('아이템명 또는 스탯 조건을 입력해주세요.')
         matched=items.loc[mask_for_item_query(items,query)] if query else items
         matched=matched.loc[pd.to_numeric(matched.itemCode,errors='coerce').between(1000000,1999999)]
@@ -94,6 +94,11 @@ if st.session_state.request_search:
         st.session_state.rows=rows;st.session_state.duplicates=duplicates
         st.session_state.matched=matched;st.session_state.applied_query=query;st.session_state.applied_tokens=tokens
         st.session_state.applied_include_gems=include_gems
+        st.session_state.applied_without_gems=without_gems
+        st.session_state.applied_completed_only=completed_only
+        st.session_state.status_filter='판매완료' if completed_only else '전체'
+        st.session_state.gem_filter='무보석' if without_gems else '전체'
+        st.session_state.result_gem_prices=prices
         st.session_state.elapsed=time.perf_counter()-started
         st.session_state.searched=True;st.session_state.page=1;st.session_state.generation+=1
         saved={k:st.session_state[k] for k in ('query','stat1','stat2','stat3','packet_include_gems')}
@@ -131,6 +136,8 @@ with st.container(key='workspace',gap='xxsmall'):
         with st.popover('도움말'):
             st.write('궁수13: 정확값 / 궁수~13: 이하 / 궁수13~: 이상 / 궁수13~15: 구간')
             st.write('스탯 앞이나 뒤에 @를 붙이면 모든 스탯 조건에 보석을 포함합니다. 예: @도적20, 도적20@')
+            st.write('이름이나 스탯 앞뒤에 #은 무보석, $는 판매완료만 표시합니다. 예: @$도적20, #$도적20')
+            st.write('검색칸에서 영어 자판으로 눌러도 두벌식 한글로 입력됩니다.')
             st.write('이카루스 망토는 이름 칸에 회피, 이속, 점프를 입력해 종류별로 검색할 수 있습니다.')
             st.write('줄임말: 명·이·전·궁·도·단. 작 방향은 항상 보석 제외 추가치입니다.')
             st.write('법사=인트+럭+마력. 마·인·인트=합마. 법신=추가 인트+럭+마력.')
@@ -155,10 +162,10 @@ with st.container(key='workspace',gap='xxsmall'):
         with filter_area.container(key='filter_fields',gap='xxsmall'):
             with st.container(horizontal=True,vertical_alignment='center',gap='xsmall'):
                 st.html('<div class="filter-label">거래</div>',width='content')
-                status_filter=st.segmented_control('거래 상태',['전체','판매완료'],key='status_filter',required=True,label_visibility='collapsed')
+                status_filter=st.segmented_control('거래 상태',['전체','판매완료'],key='status_filter',required=True,label_visibility='collapsed',disabled=st.session_state.get('applied_completed_only',False))
             with st.container(horizontal=True,vertical_alignment='center',gap='xsmall'):
                 st.html('<div class="filter-label">보석</div>',width='content')
-                gem_filter=st.segmented_control('보석 장착',['전체','유보석','무보석'],key='gem_filter',required=True,label_visibility='collapsed')
+                gem_filter=st.segmented_control('보석 장착',['전체','유보석','무보석'],key='gem_filter',required=True,label_visibility='collapsed',disabled=st.session_state.get('applied_without_gems',False))
             with st.container(horizontal=True,vertical_alignment='center',gap='xsmall'):
                 st.toggle('보석 포함 검색',key='packet_include_gems',on_change=request_search,help='스탯 조건에 @를 붙여도 보석을 포함해 검색합니다.')
                 external_slot=st.empty()
@@ -178,6 +185,8 @@ with st.container(key='workspace',gap='xxsmall'):
         if link:external_slot.link_button('검색페이지 열기',link)
         applied_parts=[st.session_state.get('applied_query','') or '전체 품목',*st.session_state.get('applied_tokens',[])]
         if st.session_state.get('applied_include_gems'):applied_parts.append('보석 포함')
+        if st.session_state.get('applied_without_gems'):applied_parts.append('무보석')
+        if st.session_state.get('applied_completed_only'):applied_parts.append('판매완료')
         applied=' · '.join(applied_parts)
         applied_slot.html('<div class="applied-query" title="'+escape(applied,quote=True)+'">'+escape(applied)+f' · {len(matched):,}품목</div>')
 
@@ -197,7 +206,7 @@ with st.container(key='workspace',gap='xxsmall'):
         start=(st.session_state.page-1)*100
         context=context_for_query(st.session_state.get('applied_query',''))
         if any(c.name=='단도' for c in parse_tokens(st.session_state.get('applied_tokens',[]))):context='섀도어'
-        view=packet_view(visible.iloc[start:start+100],prices=prices,context=context)
+        view=packet_view(visible.iloc[start:start+100],prices=st.session_state.get('result_gem_prices',prices),context=context)
         with st.container(key=f'results_{st.session_state.generation}_{st.session_state.page}',gap=None):
             st.html(render_table(view))
     elif st.session_state.searched:st.info('조건에 맞는 매물이 없습니다.')

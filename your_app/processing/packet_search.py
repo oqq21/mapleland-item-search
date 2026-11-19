@@ -62,6 +62,7 @@ def read_packet_rows(path,item_codes,tokens=(),include_gems=False):
 def prepare_rows(frame,catalog=None):
     if frame.empty:return frame.copy()
     frame=frame.copy();catalog=catalog or {}
+    catalog={code:catalog[code] for code in frame.itemCode.unique() if code in catalog}
     for stat in STATS:
         old=_numeric(frame,'base_'+stat)
         bases={code:number(meta.get(BASE_COLUMNS[stat])) for code,meta in catalog.items()}
@@ -185,16 +186,16 @@ def search_packet_data(active_path,completed_path,item_codes,tokens,include_gems
 
 def filter_display_rows(frame,status='전체',gem='전체',now=None):
     """UI-only filters; expire active listings without changing raw trade status."""
-    if frame.empty:return frame
-    now=pd.Timestamp.now(tz='Asia/Seoul') if now is None else pd.Timestamp(now)
-    if now.tzinfo is not None:now=now.tz_convert('Asia/Seoul').tz_localize(None)
-    expiry=_kst_naive(frame.get('_expiry_at',frame.get('internal_time',pd.Series(pd.NaT,index=frame.index))))
-    completed=frame.status.eq('completed')
-    expired=~completed & expiry.le(now)
+    if frame.empty or (status=='전체' and gem=='전체'):return frame
     mask=pd.Series(True,index=frame.index)
-    if status=='판매완료':mask &= completed
-    elif status=='만료':mask &= expired
-    elif status=='판매중':mask &= ~completed & ~expired
+    if status=='판매완료':mask &= frame.status.eq('completed')
+    elif status in {'만료','판매중'}:
+        now=pd.Timestamp.now(tz='Asia/Seoul') if now is None else pd.Timestamp(now)
+        if now.tzinfo is not None:now=now.tz_convert('Asia/Seoul').tz_localize(None)
+        expiry=_kst_naive(frame.get('_expiry_at',frame.get('internal_time',pd.Series(pd.NaT,index=frame.index))))
+        active=~frame.status.eq('completed')
+        expired=expiry.le(now)
+        mask &= active & (expired if status=='만료' else ~expired)
     if gem=='무보석':mask &= ~frame.has_gems
     elif gem=='유보석':mask &= frame.has_gems
     return frame.loc[mask]

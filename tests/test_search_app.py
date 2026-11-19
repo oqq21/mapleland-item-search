@@ -16,7 +16,7 @@ def test_search_history_pagination_and_no_market_api(tmp_path,monkeypatch):
     pd.DataFrame([row(itemCode=code,itemName=item['itemName'],sheet='활',total_PAD=116,quantity=i+1) for i in range(105)]).to_parquet(tmp_path/'packet_active.parquet')
     pd.DataFrame([row(itemCode=code,itemName=item['itemName'],sheet='활',total_PAD=117,status='completed')]).to_parquet(tmp_path/'packet_completed.parquet')
     (tmp_path/'gem_prices.json').write_text('{}',encoding='utf-8')
-    monkeypatch.setattr(remote,'ensure_data_snapshot',lambda *args,**kw:DataSnapshot('fixture','2026-11-10',tmp_path))
+    monkeypatch.setattr(remote,'get_search_snapshot',lambda *args,**kw:DataSnapshot('fixture','2026-11-10',tmp_path))
     def no_network(*args,**kw):raise AssertionError('Search must not call a market API')
     monkeypatch.setattr(requests,'get',no_network)
     app=AppTest.from_file(str(root/'streamlit_app.py'),default_timeout=30).run()
@@ -57,7 +57,7 @@ def test_gem_toggle_and_both_filters_in_real_entrypoint(tmp_path,monkeypatch):
     ]).to_parquet(tmp_path/'packet_active.parquet')
     pd.DataFrame([row(itemCode=code,sheet='활',total_PAD=116,status='completed',quantity=3)]).to_parquet(tmp_path/'packet_completed.parquet')
     (tmp_path/'gem_prices.json').write_text('{}',encoding='utf-8')
-    monkeypatch.setattr(remote,'ensure_data_snapshot',lambda *a,**k:DataSnapshot('filter-fixture','2026-11-10',tmp_path))
+    monkeypatch.setattr(remote,'get_search_snapshot',lambda *a,**k:DataSnapshot('filter-fixture','2026-11-10',tmp_path))
     app=AppTest.from_file(str(root/'streamlit_app.py'),default_timeout=30).run()
     app.text_input(key='query').set_value(item['itemName'])
     app.text_input(key='stat1').set_value('공116')
@@ -109,7 +109,7 @@ def test_stat_marker_applies_gems_to_all_fields_and_restores_from_history(tmp_pa
     pd.DataFrame([base,gemmed]).to_parquet(tmp_path/'packet_active.parquet')
     pd.DataFrame([dict(base,status='completed',total_DEX=0)]).to_parquet(tmp_path/'packet_completed.parquet')
     (tmp_path/'gem_prices.json').write_text('{}',encoding='utf-8')
-    monkeypatch.setattr(remote,'ensure_data_snapshot',lambda *a,**k:DataSnapshot('marker-fixture','2026-11-18',tmp_path))
+    monkeypatch.setattr(remote,'get_search_snapshot',lambda *a,**k:DataSnapshot('marker-fixture','2026-11-18',tmp_path))
     app=AppTest.from_file(str(root/'streamlit_app.py'),default_timeout=30).run()
     app.text_input(key='query').set_value(f"@{item['itemName']}@")
     app.text_input(key='stat1').set_value('도적20')
@@ -138,3 +138,37 @@ def test_stat_marker_applies_gems_to_all_fields_and_restores_from_history(tmp_pa
     assert set(app.session_state['rows']['quantity'])=={1,2}
     app.text_input(key='stat3').set_value('@').run()
     assert app.error and not app.exception
+
+
+def test_search_markers_combine_gems_and_completed_filters(tmp_path,monkeypatch):
+    import your_app.common.remote_data as remote
+    root=Path(__file__).resolve().parents[1]
+    items=json.loads((root/'resources/item_catalog.json').read_text(encoding='utf-8'))
+    item=next(r for r in items if '네쉐르' in r['itemName'])
+    body=row(itemCode=item['itemCode'],total_PAD=116,quantity=1)
+    gemmed=dict(body,total_PAD=113,gem_PAD=3,option_codes='26000',quantity=2)
+    pd.DataFrame([dict(body,quantity=3),dict(gemmed,quantity=4)]).to_parquet(tmp_path/'packet_active.parquet')
+    pd.DataFrame([dict(body,status='completed'),dict(gemmed,status='completed')]).to_parquet(tmp_path/'packet_completed.parquet')
+    (tmp_path/'gem_prices.json').write_text('{}',encoding='utf-8')
+    monkeypatch.setattr(remote,'get_search_snapshot',lambda *a,**k:DataSnapshot('combined-marker-fixture','2026-11-19',tmp_path))
+    app=AppTest.from_file(str(root/'streamlit_app.py'),default_timeout=30).run()
+    app.text_input(key='query').set_value(item['itemName'])
+    app.text_input(key='stat1').set_value('@$공116').run()
+    assert not app.exception and not app.error
+    assert app.session_state['applied_include_gems']
+    assert app.button_group(key='status_filter').value=='판매완료'
+    assert any(c.value.startswith('2건') for c in app.caption)
+
+    app.text_input(key='stat1').set_value('공116#$').run()
+    assert not app.exception and not app.error
+    assert not app.session_state['applied_include_gems']
+    assert app.button_group(key='gem_filter').value=='무보석'
+    assert any(c.value.startswith('1건') for c in app.caption)
+
+    app.text_input(key='query').set_value(f'#{item["itemName"]}$')
+    app.text_input(key='stat1').set_value('공116').run()
+    assert not app.exception and not app.error
+    assert any(c.value.startswith('1건') for c in app.caption)
+    app.button(key='history_2').click().run()
+    assert app.text_input(key='stat1').value=='@$공116'
+    assert any(c.value.startswith('2건') for c in app.caption)

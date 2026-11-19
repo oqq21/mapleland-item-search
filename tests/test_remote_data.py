@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -222,6 +224,41 @@ class RemoteDataTests(unittest.TestCase):
             )
             self.assertEqual(snapshot.version, "version-two")
             self.assertEqual(state["asset_downloads"], ["packet_active.parquet"])
+
+
+def test_search_keeps_cached_snapshot_during_single_background_refresh(tmp_path, monkeypatch):
+    old = tmp_path / "old"
+    old.mkdir()
+    files = {name: b"saved" for name in remote_data.DATA_FILES}
+    for name, content in files.items():
+        (old / name).write_bytes(content)
+    (old / "manifest.json").write_text(json.dumps(_manifest("old", files)), encoding="utf-8")
+    fresh = remote_data.DataSnapshot("fresh", "", tmp_path / "fresh")
+    started = threading.Event()
+    release = threading.Event()
+    workers = []
+
+    def download(root, *, check_interval):
+        workers.append(threading.current_thread())
+        started.set()
+        assert release.wait(5)
+        return fresh
+
+    monkeypatch.setattr(remote_data, "ensure_data_snapshot", download)
+    assert remote_data.get_search_snapshot(tmp_path).version == "old"
+    assert not workers
+    try:
+        assert remote_data.get_search_snapshot(tmp_path, refresh=True).version == "old"
+        assert started.wait(2)
+        for _ in range(3):
+            assert remote_data.get_search_snapshot(tmp_path, refresh=True).version == "old"
+        assert len(workers) == 1
+    finally:
+        release.set()
+        if workers:
+            workers[0].join(5)
+    assert remote_data.get_search_snapshot(tmp_path, refresh=True) == fresh
+    assert len(workers) == 1
 
 
 if __name__ == "__main__":

@@ -38,8 +38,6 @@ _STATE: dict[str, object] = {
     "checked_at": 0.0,
     "snapshot": None,
 }
-
-
 @dataclass(frozen=True)
 class DataSnapshot:
     version: str
@@ -48,6 +46,12 @@ class DataSnapshot:
 
     def path(self, name: str) -> Path:
         return self.directory / name
+
+
+_SEARCH_LOCK = threading.Lock()
+_SEARCH_SNAPSHOTS: dict[Path, DataSnapshot] = {}
+_SEARCH_NEXT_CHECK: dict[Path, float] = {}
+_SEARCH_REFRESHING: set[Path] = set()
 
 
 def _sha256(path: Path) -> str:
@@ -96,7 +100,8 @@ def _snapshot_from_manifest(manifest_path: Path) -> DataSnapshot | None:
             json.loads(manifest_path.read_text(encoding="utf-8"))
         )
         directory = manifest_path.parent
-        if all((directory / name).exists() for name in DATA_FILES):
+        if all((directory / name).stat().st_size == int(manifest["files"][name]["size"])
+               for name in DATA_FILES):
             return DataSnapshot(
                 version=manifest["version"],
                 updated_at=str(manifest.get("updated_at") or ""),
@@ -122,6 +127,47 @@ def _cached_snapshot(cache_root: Path) -> DataSnapshot | None:
         if snapshot is not None:
             return snapshot
     return None
+
+
+def _refresh_search_snapshot(root: Path, check_interval: float) -> None:
+    try:
+        snapshot = ensure_data_snapshot(root, check_interval=check_interval)
+        with _SEARCH_LOCK:
+            _SEARCH_SNAPSHOTS[root] = snapshot
+    except Exception:
+        # The saved snapshot remains available if GitHub or verification fails.
+        pass
+    finally:
+        with _SEARCH_LOCK:
+            _SEARCH_NEXT_CHECK[root] = time.monotonic() + check_interval
+            _SEARCH_REFRESHING.discard(root)
+
+
+def get_search_snapshot(
+    cache_root: str | Path, *, refresh: bool = False, check_interval: float = 3600
+) -> DataSnapshot:
+    """Return a complete local version immediately, refreshing on search demand."""
+    root = Path(cache_root).resolve()
+    with _SEARCH_LOCK:
+        snapshot = _SEARCH_SNAPSHOTS.get(root)
+        if snapshot is None:
+            snapshot = _cached_snapshot(root)
+            if snapshot is not None:
+                _SEARCH_SNAPSHOTS[root] = snapshot
+        if snapshot is not None:
+            if (refresh and root not in _SEARCH_REFRESHING
+                    and time.monotonic() >= _SEARCH_NEXT_CHECK.get(root, 0)):
+                _SEARCH_REFRESHING.add(root)
+                threading.Thread(
+                    target=_refresh_search_snapshot, args=(root, check_interval),
+                    name="search-data-refresh", daemon=True,
+                ).start()
+            return snapshot
+    # With no local files, the first visit must wait for a complete snapshot.
+    snapshot = ensure_data_snapshot(root, check_interval=check_interval)
+    with _SEARCH_LOCK:
+        _SEARCH_NEXT_CHECK.setdefault(root, time.monotonic() + check_interval)
+        return _SEARCH_SNAPSHOTS.setdefault(root, snapshot)
 
 
 def _download_file(url: str, target: Path, expected_sha: str, expected_size: int) -> None:
@@ -258,6 +304,8 @@ def ensure_data_snapshot(
     with _LOCK:
         now = time.monotonic()
         current = _STATE.get("snapshot")
+        if isinstance(current, DataSnapshot) and current.directory.parent != root:
+            current = None
         checked_at = float(_STATE.get("checked_at") or 0.0)
         if (
             isinstance(current, DataSnapshot)
@@ -342,6 +390,14 @@ def ensure_data_snapshot(
                 manifest = _validate_manifest(manifest_response.json())
             version = manifest["version"]
             directory = root / version
+            manifest_path = directory / "manifest.json"
+            saved = _snapshot_from_manifest(manifest_path)
+            if saved is not None:
+                saved_files = json.loads(manifest_path.read_text(encoding="utf-8"))["files"]
+                if any(saved_files[name]["sha256"] != manifest["files"][name]["sha256"] for name in DATA_FILES):
+                    raise ValueError("기존 버전에 다른 보석가·매물 파일이 게시되었습니다.")
+                _STATE.update(snapshot=saved, checked_at=time.monotonic())
+                return saved
             blob_dir = root / "blobs"
             directory.mkdir(parents=True, exist_ok=True)
             blob_dir.mkdir(parents=True, exist_ok=True)
@@ -377,17 +433,19 @@ def ensure_data_snapshot(
                 if not target_valid:
                     _link_or_copy(blob, target)
 
-            (directory / "manifest.json").write_text(
+            manifest_tmp = manifest_path.with_suffix(".tmp")
+            manifest_tmp.write_text(
                 json.dumps(manifest, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+            manifest_tmp.replace(manifest_path)
             snapshot = DataSnapshot(
                 version=version,
                 updated_at=str(manifest.get("updated_at") or ""),
                 directory=directory,
             )
             _STATE["snapshot"] = snapshot
-            _STATE["checked_at"] = now
+            _STATE["checked_at"] = time.monotonic()
             _prune_cache(root, version)
             return snapshot
         except Exception:
