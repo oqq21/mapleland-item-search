@@ -22,7 +22,7 @@ from your_app.gui.compact_layout import COMPACT_CSS
 ROOT=Path(__file__).resolve().parent
 CATALOG_PATH=ROOT/'resources/item_catalog.json'
 CATALOG_REVISION=CATALOG_PATH.stat().st_mtime_ns
-APP_BUILD="2026-11-19-search-v16-quick-input"
+APP_BUILD="2026-11-19-search-v17-equipped-gem-marker"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="collapsed")
 st.html(COMPACT_CSS)
 st.html('<script>'+(ROOT/'your_app/gui/korean_input.js').read_text(encoding='utf-8')+'</script>',unsafe_allow_javascript=True)
@@ -78,9 +78,9 @@ if st.session_state.request_search:
     try:
         query,tokens,markers=split_search_markers(st.session_state.query,(st.session_state[k] for k in ('stat1','stat2','stat3')))
         conditions=parse_tokens(tokens)
-        without_gems='#' in markers
+        marker_gem_filter='무보석' if '#' in markers else '유보석' if '@' in markers else '전체'
         completed_only='$' in markers
-        include_gems=not without_gems and ('@' in markers or st.session_state.packet_include_gems)
+        include_gems=marker_gem_filter!='무보석' and (marker_gem_filter=='유보석' or st.session_state.packet_include_gems)
         if not query and not tokens:raise ValueError('아이템명 또는 스탯 조건을 입력해주세요.')
         matched=items.loc[mask_for_item_query(items,query)] if query else items
         matched=matched.loc[pd.to_numeric(matched.itemCode,errors='coerce').between(1000000,1999999)]
@@ -94,10 +94,10 @@ if st.session_state.request_search:
         st.session_state.rows=rows;st.session_state.duplicates=duplicates
         st.session_state.matched=matched;st.session_state.applied_query=query;st.session_state.applied_tokens=tokens
         st.session_state.applied_include_gems=include_gems
-        st.session_state.applied_without_gems=without_gems
+        st.session_state.applied_marker_gem_filter=marker_gem_filter
         st.session_state.applied_completed_only=completed_only
         st.session_state.status_filter='판매완료' if completed_only else '전체'
-        st.session_state.gem_filter='무보석' if without_gems else '전체'
+        st.session_state.gem_filter=marker_gem_filter
         st.session_state.result_gem_prices=prices
         st.session_state.elapsed=time.perf_counter()-started
         st.session_state.searched=True;st.session_state.page=1;st.session_state.generation+=1
@@ -135,7 +135,7 @@ with st.container(key='workspace',gap='xxsmall'):
         if st.button('보석값'):show_gem_prices()
         with st.popover('도움말'):
             st.write('궁수13: 정확값 / 궁수~13: 이하 / 궁수13~: 이상 / 궁수13~15: 구간')
-            st.write('스탯 앞이나 뒤에 @를 붙이면 모든 스탯 조건에 보석을 포함합니다. 예: @도적20, 도적20@')
+            st.write('스탯 앞이나 뒤에 @를 붙이면 유보석 매물만 보석 포함 스탯으로 검색합니다. 예: @도적20, 도적20@')
             st.write('이름이나 스탯 앞뒤에 #은 무보석, $는 판매완료만 표시합니다. 예: @$도적20, #$도적20')
             st.write('검색칸에서 영어 자판으로 눌러도 두벌식 한글로 입력됩니다.')
             st.write('이카루스 망토는 이름 칸에 회피, 이속, 점프를 입력해 종류별로 검색할 수 있습니다.')
@@ -165,9 +165,9 @@ with st.container(key='workspace',gap='xxsmall'):
                 status_filter=st.segmented_control('거래 상태',['전체','판매완료'],key='status_filter',required=True,label_visibility='collapsed',disabled=st.session_state.get('applied_completed_only',False))
             with st.container(horizontal=True,vertical_alignment='center',gap='xsmall'):
                 st.html('<div class="filter-label">보석</div>',width='content')
-                gem_filter=st.segmented_control('보석 장착',['전체','유보석','무보석'],key='gem_filter',required=True,label_visibility='collapsed',disabled=st.session_state.get('applied_without_gems',False))
+                gem_filter=st.segmented_control('보석 장착',['전체','유보석','무보석'],key='gem_filter',required=True,label_visibility='collapsed',disabled=st.session_state.get('applied_marker_gem_filter','전체')!='전체')
             with st.container(horizontal=True,vertical_alignment='center',gap='xsmall'):
-                st.toggle('보석 포함 검색',key='packet_include_gems',on_change=request_search,help='스탯 조건에 @를 붙여도 보석을 포함해 검색합니다.')
+                st.toggle('보석 포함 검색',key='packet_include_gems',on_change=request_search,help='모든 매물을 보석 포함 스탯으로 비교합니다. 스탯에 @를 붙이면 유보석 매물만 검색합니다.')
                 external_slot=st.empty()
             applied_slot=st.empty()
         if st.session_state.history:
@@ -185,7 +185,7 @@ with st.container(key='workspace',gap='xxsmall'):
         if link:external_slot.link_button('검색페이지 열기',link)
         applied_parts=[st.session_state.get('applied_query','') or '전체 품목',*st.session_state.get('applied_tokens',[])]
         if st.session_state.get('applied_include_gems'):applied_parts.append('보석 포함')
-        if st.session_state.get('applied_without_gems'):applied_parts.append('무보석')
+        if st.session_state.get('applied_marker_gem_filter')=='무보석':applied_parts.append('무보석')
         if st.session_state.get('applied_completed_only'):applied_parts.append('판매완료')
         applied=' · '.join(applied_parts)
         applied_slot.html('<div class="applied-query" title="'+escape(applied,quote=True)+'">'+escape(applied)+f' · {len(matched):,}품목</div>')

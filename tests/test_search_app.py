@@ -127,14 +127,18 @@ def test_stat_marker_applies_gems_to_all_fields_and_restores_from_history(tmp_pa
         assert not app.exception and not app.error
         assert app.session_state['applied_include_gems']
         assert set(app.session_state['rows']['quantity'])=={1,2}
+        assert app.button_group(key='gem_filter').value=='유보석'
+        assert any(c.value.startswith('1건') for c in app.caption)
         assert not app.toggle(key='packet_include_gems').value
 
     app.text_input(key='stat3').set_value('업5').run()
     assert not app.session_state['applied_include_gems']
+    assert app.button_group(key='gem_filter').value=='전체'
     assert app.session_state['rows']['quantity'].tolist()==[1]
     app.button(key='history_1').click().run()
     assert app.text_input(key='stat3').value=='@업5@'
     assert app.session_state['applied_include_gems']
+    assert app.button_group(key='gem_filter').value=='유보석'
     assert set(app.session_state['rows']['quantity'])=={1,2}
     app.text_input(key='stat3').set_value('@').run()
     assert app.error and not app.exception
@@ -157,7 +161,8 @@ def test_search_markers_combine_gems_and_completed_filters(tmp_path,monkeypatch)
     assert not app.exception and not app.error
     assert app.session_state['applied_include_gems']
     assert app.button_group(key='status_filter').value=='판매완료'
-    assert any(c.value.startswith('2건') for c in app.caption)
+    assert app.button_group(key='gem_filter').value=='유보석'
+    assert any(c.value.startswith('1건') for c in app.caption)
 
     app.text_input(key='stat1').set_value('공116#$').run()
     assert not app.exception and not app.error
@@ -171,4 +176,5 @@ def test_search_markers_combine_gems_and_completed_filters(tmp_path,monkeypatch)
     assert any(c.value.startswith('1건') for c in app.caption)
     app.button(key='history_2').click().run()
     assert app.text_input(key='stat1').value=='@$공116'
-    assert any(c.value.startswith('2건') for c in app.caption)
+    assert app.button_group(key='gem_filter').value=='유보석'
+    assert any(c.value.startswith('1건') for c in app.caption)
