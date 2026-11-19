@@ -14,7 +14,7 @@ from your_app.common.query_utils import mask_for_item_query, _ensure_cache_colum
 from your_app.common.stat_query import parse_tokens, split_search_markers
 from your_app.common.display_format import price_in_man
 from your_app.common.site_links import search_page_url
-from your_app.domain.search_rules import context_for_query, number
+from your_app.domain.search_rules import context_for_query, gem_costs, number, parse_calculator_gems
 from your_app.processing.packet_search import search_packet_data, packet_view, format_stat_text, GEM_OPTION_LABELS, BASE_COLUMNS, filter_display_rows
 from your_app.gui.search_table import render_table
 from your_app.gui.compact_layout import COMPACT_CSS
@@ -22,7 +22,7 @@ from your_app.gui.compact_layout import COMPACT_CSS
 ROOT=Path(__file__).resolve().parent
 CATALOG_PATH=ROOT/'resources/item_catalog.json'
 CATALOG_REVISION=CATALOG_PATH.stat().st_mtime_ns
-APP_BUILD="2026-11-19-search-v17-equipped-gem-marker"
+APP_BUILD="2026-11-19-search-v18-gem-calculator"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="collapsed")
 st.html(COMPACT_CSS)
 st.html('<script>'+(ROOT/'your_app/gui/korean_input.js').read_text(encoding='utf-8')+'</script>',unsafe_allow_javascript=True)
@@ -135,7 +135,7 @@ with st.container(key='workspace',gap='xxsmall'):
         if st.button('보석값'):show_gem_prices()
         with st.popover('도움말'):
             st.write('궁수13: 정확값 / 궁수~13: 이하 / 궁수13~: 이상 / 궁수13~15: 구간')
-            st.write('스탯 앞이나 뒤에 @를 붙이면 유보석 매물만 보석 포함 스탯으로 검색합니다. 예: @도적20, 도적20@')
+            st.write('스탯 칸에 @를 단독으로 넣거나 조건 앞뒤에 붙이면 유보석 매물만 보석 포함 스탯으로 검색합니다.')
             st.write('이름이나 스탯 앞뒤에 #은 무보석, $는 판매완료만 표시합니다. 예: @$도적20, #$도적20')
             st.write('검색칸에서 영어 자판으로 눌러도 두벌식 한글로 입력됩니다.')
             st.write('이카루스 망토는 이름 칸에 회피, 이속, 점프를 입력해 종류별로 검색할 수 있습니다.')
@@ -143,6 +143,7 @@ with st.container(key='workspace',gap='xxsmall'):
             st.write('법사=인트+럭+마력. 마·인·인트=합마. 법신=추가 인트+럭+마력.')
             st.write('노작=남은 업횟이 기본 업횟과 같음. 완작·업6·작5도 검색할 수 있습니다.')
             st.write('보석 옵션명은 필수 파랑, 보조 초록, 그 외 회색입니다. 상급 숫자는 파랑, 중·하급 숫자는 빨강입니다.')
+            st.write('보석가는 달린 보석을 모두 포함합니다. 보석제외가는 판매가에서 필수·보조 보석값을 뺀 금액입니다. 별도 필수·보조 기준이 없으면 모든 보석을 인정합니다.')
             st.write('보석 누락·등급 미달·리버스 무보석은 보석 칸에 빨간 배경을 표시합니다. 보석 비중이 높으면 가격에 빨간 글씨를 표시합니다.')
             st.write('확인된 2분 이하 판매는 행 배경이 빨강입니다. 판매소요가 미확인이면 마우스를 올려 사유를 볼 수 있습니다.')
             st.write('완료와 연결된 매물은 판매중 수집시각으로 정렬합니다. 새 검색·기록 선택은 목록 맨 위부터 시작합니다.')
@@ -151,7 +152,7 @@ with st.container(key='workspace',gap='xxsmall'):
             st.caption(APP_BUILD)
 
     with st.container(key='search_controls',gap=None):
-        search_area,filter_area,history_area=st.columns(3,gap='small',vertical_alignment='top',wrap=False)
+        history_area,search_area,filter_area,calculator_area=st.columns(4,gap='small',vertical_alignment='top',wrap=False)
         with search_area.container(key='search_fields',gap='xxsmall'):
             st.text_input('이름',key='query',placeholder='아이템명 / 도적신발 / 신망토',on_change=request_search)
             fields=st.columns([1,1,1,.55],gap='xsmall',vertical_alignment='bottom',wrap=False)
@@ -177,6 +178,19 @@ with st.container(key='workspace',gap='xxsmall'):
                     for i,h in enumerate(st.session_state.history):
                         label,help_text=history_label(h)
                         st.button(label,key=f'history_{i}',help=help_text,on_click=restore_history,args=(i,),width='stretch')
+        else:
+            with history_area.container(key='recent_searches',gap='xxsmall'):
+                st.html('<div class="recent-label">최근 검색</div>',width='content')
+                st.caption('검색하면 여기에 표시됩니다.')
+        with calculator_area.container(key='gem_calculator',gap='xxsmall'):
+            gem_input=st.text_input('보석 계산기',key='calculator_gems',placeholder='공3 덱5 럭5')
+            if gem_input.strip():
+                try:
+                    materials,fee=gem_costs(parse_calculator_gems(gem_input),prices)
+                    st.markdown(f'**{price_in_man(materials+fee):,}만 메소**')
+                    st.caption(f'재료 {price_in_man(materials):,}만 + 가공비 {price_in_man(fee):,}만')
+                except ValueError as exc:
+                    st.caption(str(exc))
 
     if st.session_state.get('search_error'):st.error(st.session_state.search_error)
     matched=st.session_state.get('matched',pd.DataFrame())

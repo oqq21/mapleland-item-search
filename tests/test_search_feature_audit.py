@@ -73,9 +73,10 @@ def test_optional_grade_and_useless_gem_do_not_invalidate_valid_armor():
     assert useless['gem_valid'] and useless['recognized_gem_cost']==6_750_000
 
 
-def test_gem_excluded_price_is_full_cost_and_may_be_negative():
-    view=packet_view(pd.DataFrame([row(option_codes='26008,26011',unit_price=1_000_000)]),prices={'26008':2_000_000,'26011':1_000_000})
-    assert view.iloc[0]['인정보석원가(만)']==975
+def test_all_gems_appear_in_cost_but_only_recognized_gems_are_subtracted():
+    prices={'26008':2_000_000,'26011':1_000_000,'26010':10_000_000}
+    view=packet_view(pd.DataFrame([row(option_codes='26008,26011,26010',unit_price=1_000_000)]),prices=prices)
+    assert view.iloc[0]['보석가(만)']==2200
     assert view.iloc[0]['보석제외가(만)']==-875
     html=render_table(view)
     assert 'gem-cell gem-white' in html
@@ -93,9 +94,9 @@ def test_compact_stats_and_work_count_do_not_add_columns():
     from your_app.gui.search_table import COLUMNS
     source=row(itemName='테스트 신발',total_DEX=7,add_DEX=24,total_upgrade_left=2,total_work_count=3,unit_price=123455000)
     view=packet_view(pd.DataFrame([source]));record=view.iloc[0]
-    assert record['아이템']=='테스트 신발 3작'
+    assert record['아이템']=='테스트 신발'
     assert record['총스탯']=='덱7 업2 [ 24 ]'
-    assert 'color:#b42318' in record['_총스탯HTML'] and '>업2</span>' in record['_총스탯HTML']
+    assert 'class="upgrade-left"' in record['_총스탯HTML'] and '>업2</span>' in record['_총스탯HTML']
     assert record['판매가(만)']==12346
     assert source['unit_price']==123455000
     assert not {'추가옵 합','업횟','작횟'} & set(view.columns)
@@ -106,19 +107,19 @@ def test_compact_stats_and_work_count_do_not_add_columns():
     assert '덱7 <span class="upgrade-left"' in rendered
     source.update(total_upgrade_left=0,total_work_count=0,option_codes='26011')
     record=packet_view(pd.DataFrame([source])).iloc[0]
-    assert record['총스탯']=='■ 덱7' and record['아이템']=='테스트 신발'
-    assert 'title="보석 장착">■</span>' in record['_총스탯HTML']
+    assert record['총스탯']=='덱7 ▪▪▪' and record['아이템']=='테스트 신발'
+    assert 'aria-label="보석 장착">▪▪▪</span>' in record['_총스탯HTML']
     assert 'upgrade-left' not in record['_총스탯HTML']
 
 
 def test_equipped_marker_is_display_only_and_warning_is_not_lost():
     equipped=row(total_DEX=7,option_codes='26011')
     view=packet_view(pd.DataFrame([equipped,row(total_DEX=7)]))
-    assert view.iloc[0]['총스탯'].startswith('■ ')
-    assert not view.iloc[1]['총스탯'].startswith('■ ')
+    assert view.iloc[0]['총스탯'].endswith('▪▪▪')
+    assert not view.iloc[1]['총스탯'].endswith('▪▪▪')
     assert equipped['total_DEX']==7
     html=render_table(view)
-    assert 'color:#111111' in html and '보석 장착' in html
+    assert 'white-space:nowrap' in html and '보석 장착' in html
     assert '필수 누락' in html
     assert '무효 사유</th>' in html
     clean=render_table(packet_view(pd.DataFrame([row()])))

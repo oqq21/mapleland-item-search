@@ -1,5 +1,5 @@
 (() => {
-    const selector = '.st-key-search_fields [data-testid="stTextInput"] input[type="text"]';
+    const selector = ':is(.st-key-search_fields,.st-key-gem_calculator) [data-testid="stTextInput"] input[type="text"]';
     if (window.itemSearchKoreanInputInstalled) return;
     window.itemSearchKoreanInputInstalled = true;
 

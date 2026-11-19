@@ -40,8 +40,6 @@ def split_search_markers(name, fields):
     tokens = []
     for field in fields:
         condition, field_markers = _split_markers(field, '@#$')
-        if not condition and field_markers == {'@'}:
-            raise ValueError('@ 앞이나 뒤에 스탯 조건을 입력해주세요. (예: @도적20)')
         if condition:
             tokens.append(condition)
         markers.update(field_markers)

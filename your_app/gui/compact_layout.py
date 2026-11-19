@@ -20,7 +20,7 @@ html, body, [data-testid="stAppViewContainer"] {height:100%;overflow:hidden;}
 .app-title {font-size:23px;font-weight:750;line-height:38px;margin-right:12px;white-space:nowrap;color:#26354a;}
 .applied-query {font-size:14px;line-height:1.4;color:#526074;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
 .st-key-search_controls [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .st-key-search_fields) {
- display:grid;grid-template-columns:minmax(0,510px) minmax(275px,320px) minmax(210px,1fr);gap:14px;
+ display:grid;grid-template-columns:minmax(210px,1.05fr) minmax(320px,1.4fr) minmax(275px,1fr) minmax(155px,.8fr);gap:14px;
 }
 .st-key-search_fields {gap:5px!important;border:1px solid #dbe2ec;border-radius:8px;padding:9px 12px;background:#f8faff;}
 .st-key-search_fields [data-testid="stHorizontalBlock"] {
@@ -30,6 +30,8 @@ html, body, [data-testid="stAppViewContainer"] {height:100%;overflow:hidden;}
 .st-key-search_fields [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {width:100%;min-width:0;}
 .st-key-search_fields [data-testid="stButton"] button {min-height:42px;}
 .st-key-filter_fields {gap:5px!important;padding:4px 0;}
+.st-key-gem_calculator {gap:5px!important;padding:4px 0;min-width:0;}
+.st-key-search_fields input, .st-key-gem_calculator input {font-weight:700;}
 .filter-label {min-width:44px;font-size:16px;font-weight:700;line-height:38px;white-space:nowrap;}
 .st-key-recent_searches {max-width:540px;padding-top:4px;}
 .recent-label {font-size:14px;font-weight:700;line-height:1.5;}
@@ -58,18 +60,18 @@ html, body, [data-testid="stAppViewContainer"] {height:100%;overflow:hidden;}
 .gem-price-table th,.gem-price-table td {padding:6px 12px;border-bottom:1px solid #dce3ed;text-align:right;}
 .gem-price-table th {background:#edf2fa;font-weight:700;}
 .gem-price-table th:first-child,.gem-price-table td:first-child {text-align:left;}
-@media (min-width:901px) and (max-width:1100px) {
+@media (min-width:741px) and (max-width:1130px) {
  .st-key-search_controls [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .st-key-search_fields) {
-  grid-template-columns:minmax(0,510px) minmax(275px,1fr);
+  grid-template-columns:minmax(0,1fr) minmax(300px,1fr);
  }
- .st-key-search_controls [data-testid="stColumn"]:has(.st-key-recent_searches) {grid-column:1/-1;}
 }
-@media(max-width:900px) {
+@media(max-width:740px) {
  [data-testid="stMainBlockContainer"] {padding:6px 8px;}
  .app-title {font-size:20px;}
  .st-key-workspace button {padding:5px 9px;}
  .st-key-search_controls [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .st-key-search_fields) {grid-template-columns:minmax(0,1fr);gap:7px;}
  .st-key-search_fields {max-width:510px;}
+ .st-key-recent_searches {max-width:100%;}
  .st-key-filter_fields {display:flex;flex-flow:row wrap;column-gap:12px!important;}
  .st-key-filter_fields > [data-testid="stLayoutWrapper"] {width:auto;}
  .st-key-filter_fields > [data-testid="stElementContainer"]:has(.applied-query) {flex-basis:100%;}

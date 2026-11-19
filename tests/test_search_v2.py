@@ -9,7 +9,7 @@ from your_app.processing.packet_search import filter_packet_rows,prepare_rows,de
 from your_app.gui.search_table import render_table
 
 def row(**kw):
-    r={'itemCode':1072000,'itemName':'테스트 신발','sheet':'신발','직업':'궁수','status':'active','captured_at':'2026-11-10 10:00:05','internal_time':'2026-11-13 10:00:00','quantity':1,'total_price':100_000_000,'unit_price':100_000_000,'option_codes':'','total_upgrade_left':0,'total_work_count':5,'base_upgrade_left':5}
+    r={'itemCode':1072144,'itemName':'테스트 신발','sheet':'신발','직업':'궁수','status':'active','captured_at':'2026-11-10 10:00:05','internal_time':'2026-11-13 10:00:00','quantity':1,'total_price':100_000_000,'unit_price':100_000_000,'option_codes':'','total_upgrade_left':0,'total_work_count':5,'base_upgrade_left':5}
     for s in STATS:r.update({'total_'+s:0,'base_'+s:0,'add_'+s:0,'gem_'+s:0})
     return {**r,**kw}
 
@@ -42,7 +42,7 @@ def test_class_alias_includes_multi_class_items():
     assert f.loc[mask_for_item_query(f,'전사신발')].itemCode.tolist()==[1,3]
 
 def test_newitemp_zero_overrides_old_base_and_no_work_uses_slots():
-    f=prepare_rows(pd.DataFrame([row(total_INT=7,base_INT=5,total_upgrade_left=5,total_work_count=0)]),{1072000:{'인':0,'업횟':7,'itemName':'이름','sheet':'신발'}})
+    f=prepare_rows(pd.DataFrame([row(itemCode=1072000,total_INT=7,base_INT=5,total_upgrade_left=5,total_work_count=0)]),{1072000:{'인':0,'업횟':7,'itemName':'이름','sheet':'신발'}})
     assert f.iloc[0].add_INT==7
     assert filter_packet_rows(f,['노작']).empty
     assert len(filter_packet_rows(f,['업5']))==1
@@ -70,15 +70,15 @@ def test_armor_grade_boundary_uses_actual_listing_price():
     assert evaluate_gems(r,{})['gem_valid']
 
 def test_weapon_grade_warning_checks_attack3_and_the_magic_exception():
-    weapon=row(sheet='활',option_codes='26000',unit_price=100_000_000)
+    weapon=row(itemCode=1452004,sheet='활',option_codes='26000',unit_price=100_000_000)
     assert evaluate_gems(weapon,{})['gem_cell_style']=='white'
     assert '필수 누락' in evaluate_gems({**weapon,'unit_price':100_000_001},{})['invalid_reasons']
     assert '상급 부족' in evaluate_gems({**weapon,'option_codes':'16000'},{})['invalid_reasons']
-    wand=row(sheet='완드',option_codes='16001,16009',unit_price=99_999_999)
+    wand=row(itemCode=1372007,sheet='완드',option_codes='16001,16009',unit_price=99_999_999)
     assert evaluate_gems(wand,{})['gem_cell_style']=='white'
 
 def test_weapon_sixty_percent_boundary_and_mage_luk_optional():
-    r=row(sheet='완드',직업='법사',option_codes='26001,26009,26003',unit_price=20_000_000)
+    r=row(itemCode=1372007,sheet='완드',직업='법사',option_codes='26001,26009,26003',unit_price=20_000_000)
     prices={'26001':1_000_000,'26009':1_000_000,'26003':1_000_000}
     assert evaluate_gems(r,prices)['recognized_gem_cost']==12_000_000
     result=evaluate_gems(r,prices)
@@ -91,7 +91,7 @@ def test_reverse_has_no_extra_maker_fees():
     assert result['recognized_gem_cost']==300
 
 def test_common_int_gear_does_not_force_luk_even_in_mage_search():
-    r=row(직업='',option_codes='26009,26003,26006')
+    r=row(itemCode=1072000,직업='',option_codes='26009,26003,26006')
     result=evaluate_gems(r,{},context='법사')
     assert result['gem_valid'] and '럭' not in result['invalid_reasons']
 
