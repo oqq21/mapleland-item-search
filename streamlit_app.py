@@ -22,7 +22,7 @@ from your_app.gui.compact_layout import COMPACT_CSS
 ROOT=Path(__file__).resolve().parent
 CATALOG_PATH=ROOT/'resources/item_catalog.json'
 CATALOG_REVISION=CATALOG_PATH.stat().st_mtime_ns
-APP_BUILD="2026-11-18-search-v14-gem-marker"
+APP_BUILD="2026-11-19-search-v15-icarus"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="collapsed")
 st.html(COMPACT_CSS)
 
@@ -131,6 +131,7 @@ with st.container(key='workspace',gap='xxsmall'):
         with st.popover('도움말'):
             st.write('궁수13: 정확값 / 궁수~13: 이하 / 궁수13~: 이상 / 궁수13~15: 구간')
             st.write('스탯 앞이나 뒤에 @를 붙이면 모든 스탯 조건에 보석을 포함합니다. 예: @도적20, 도적20@')
+            st.write('이카루스 망토는 이름 칸에 회피, 이속, 점프를 입력해 종류별로 검색할 수 있습니다.')
             st.write('줄임말: 명·이·전·궁·도·단. 작 방향은 항상 보석 제외 추가치입니다.')
             st.write('법사=인트+럭+마력. 마·인·인트=합마. 법신=추가 인트+럭+마력.')
             st.write('노작=남은 업횟이 기본 업횟과 같음. 완작·업6·작5도 검색할 수 있습니다.')

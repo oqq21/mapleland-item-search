@@ -17,6 +17,7 @@ CATEGORY_SHEET_ALIASES = {
     "귀거리": "귀고리",
     "망토": "망토",
 }
+ICARUS_CLOAK_CODES = {"회피": 1102054, "이속": 1102055, "점프": 1102056}
 
 
 def _normalize_search_text(value: str) -> str:
@@ -161,6 +162,11 @@ def mask_for_query(df, q: str):
 def mask_for_item_query(df, q: str):
     """Match exact category aliases by sheet, otherwise match item names."""
     normalized = _normalize_search_text(q)
+    icarus_variant = re.fullmatch(r"(?:이카루스(?:의?망토)?)?(회피|이속|점프)", normalized)
+    if icarus_variant:
+        return pd.to_numeric(df['itemCode'], errors='coerce').eq(ICARUS_CLOAK_CODES[icarus_variant[1]])
+    if normalized in {'이카루스', '이카루스망토', '이카루스의망토'}:
+        return pd.to_numeric(df['itemCode'], errors='coerce').isin(ICARUS_CLOAK_CODES.values())
     cloak_codes = {'신이속':{1102101,1102104},'신점프':{1102102,1102105},'신회피':{1102103,1102106},'신망토':set(range(1102101,1102107))}
     if normalized in cloak_codes:
         return pd.to_numeric(df['itemCode'], errors='coerce').isin(cloak_codes[normalized])

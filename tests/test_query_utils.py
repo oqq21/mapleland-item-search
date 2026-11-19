@@ -89,6 +89,20 @@ class QueryBoundaryTests(unittest.TestCase):
             with self.subTest(query=query):
                 self.assertEqual(set(items.loc[mask_for_item_query(items, query), "itemCode"]), expected_codes)
 
+    def test_icarus_cloak_queries_select_each_catalog_variant(self):
+        catalog = Path(__file__).resolve().parents[1] / "resources" / "item_catalog.json"
+        items = pd.DataFrame(json.loads(catalog.read_text(encoding="utf-8")))
+        variants = {"회피": 1102054, "이속": 1102055, "점프": 1102056}
+        for stat, code in variants.items():
+            for query in (stat, f"이카루스 망토 {stat}", f"이카루스의 망토({stat})"):
+                with self.subTest(query=query):
+                    matched = items.loc[mask_for_item_query(items, query)]
+                    self.assertEqual(matched["itemCode"].tolist(), [code])
+                    self.assertEqual(matched["itemName"].tolist(), [f"이카루스의 망토({stat})"])
+        for query in ("이카루스 망토", "@이카루스의 망토@"):
+            with self.subTest(query=query):
+                self.assertEqual(set(items.loc[mask_for_item_query(items, query), "itemCode"]), set(variants.values()))
+
     def test_category_aliases_select_the_whole_item_sheet(self):
         items = pd.DataFrame({
             "itemName": ["장미꽃 귀고리", "캣츠 아이", "타임리스 문라이트", "장미꽃"],
