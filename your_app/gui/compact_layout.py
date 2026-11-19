@@ -31,6 +31,8 @@ html, body, [data-testid="stAppViewContainer"] {height:100%;overflow:hidden;}
 .st-key-search_fields [data-testid="stButton"] button {min-height:42px;}
 .st-key-filter_fields {gap:5px!important;padding:4px 0;}
 .st-key-gem_calculator {gap:5px!important;padding:4px 0;min-width:0;}
+.calculator-total {font-size:19px;font-weight:750;line-height:1.35;}
+.calculator-detail {margin-top:3px;color:#526074;font-size:13px;line-height:1.4;}
 .st-key-search_fields input, .st-key-gem_calculator input {font-weight:700;}
 .filter-label {min-width:44px;font-size:16px;font-weight:700;line-height:38px;white-space:nowrap;}
 .st-key-recent_searches {max-width:540px;padding-top:4px;}

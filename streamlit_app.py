@@ -187,8 +187,8 @@ with st.container(key='workspace',gap='xxsmall'):
             if gem_input.strip():
                 try:
                     materials,fee=gem_costs(parse_calculator_gems(gem_input),prices)
-                    st.markdown(f'**{price_in_man(materials+fee):,}만 메소**')
-                    st.caption(f'재료 {price_in_man(materials):,}만 + 가공비 {price_in_man(fee):,}만')
+                    st.html(f'<div class="calculator-total">{price_in_man(materials+fee):,}만 메소</div>'
+                            f'<div class="calculator-detail">재료 {price_in_man(materials):,}만 + 가공비 {price_in_man(fee):,}만</div>')
                 except ValueError as exc:
                     st.caption(str(exc))
 

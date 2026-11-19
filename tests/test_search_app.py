@@ -25,7 +25,7 @@ def test_search_history_pagination_and_no_market_api(tmp_path,monkeypatch):
     assert [field.key for field in app.text_input]==['query','stat1','stat2','stat3','calculator_gems']
     assert [field.label for field in app.text_input]==['이름','스탯1','스탯2','스탯3','보석 계산기']
     app.text_input(key='calculator_gems').set_value('공3 덱5 럭5').run()
-    assert any('가공비 900만' in caption.value for caption in app.caption)
+    assert any('가공비 900만' in element.value for element in app.get('html'))
     assert app.button_group(key='status_filter').options==['전체','판매완료']
     assert all('판매 API' not in b.label and '구매 API' not in b.label for b in app.button)
     def search(value):
