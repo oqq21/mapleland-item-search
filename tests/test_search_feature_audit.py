@@ -173,31 +173,32 @@ def test_missing_sale_duration_is_visible_and_has_reason():
     assert '연결할 판매중 자료 없음' in render_table(view)
 
 
-@pytest.mark.parametrize('seconds,confirmed',[(86400,False),(86401,True),(259200,True),(259201,False)])
-def test_registration_requires_more_than_one_day_left(seconds,confirmed):
+@pytest.mark.parametrize('seconds,days,assumed',[(0,None,False),(86400,1,True),(86401,3,False),(259200,3,False),(259201,None,False)])
+def test_registration_uses_one_day_for_short_unknown_window(seconds,days,assumed):
     from your_app.processing.packet_search import add_packet_times
     expiry=pd.Timestamp('2026-11-13 23:50:00')
     captured=expiry-pd.Timedelta(seconds=seconds)
     actual=add_packet_times(pd.DataFrame([row(captured_at=str(captured),internal_time=str(expiry))])).iloc[0]
-    if confirmed:
-        assert actual['_registered_at']==expiry-pd.Timedelta(days=3)
-        assert actual['_time_reason']==''
-    else:
+    assert actual['_registration_assumed']==assumed
+    if days is None:
         assert pd.isna(actual['_registered_at'])
+    else:
+        assert actual['_registered_at']==expiry-pd.Timedelta(days=days)
 
 
-def test_unconfirmed_one_day_listing_stays_unknown():
+def test_unconfirmed_one_day_listing_gets_duration():
     from your_app.processing.packet_search import add_packet_times,deduplicate_active_completed
     f=add_packet_times(pd.DataFrame([row(internal_time='2026-11-12 10:00:00')]))
     assert f.iloc[0]['_registered_at']==pd.Timestamp('2026-11-09 10:00:00')
     active=pd.DataFrame([row(captured_at='2026-11-10 10:30:00',internal_time='2026-11-11 10:00:00')])
     completed=pd.DataFrame([row(status='completed',captured_at='2026-11-10 12:00:10',internal_time='2026-11-10 12:00:00')])
     _,linked,_=deduplicate_active_completed(active,completed)
-    assert pd.isna(linked.iloc[0]['_sale_duration_seconds'])
-    assert linked.iloc[0]['_time_reason']=='등록기간 미확인'
+    assert linked.iloc[0]['_sale_duration_seconds']==7200
+    assert linked.iloc[0]['_time_reason']=='등록기간 1일로 계산'
     active['listing_days']=1
     _,linked,_=deduplicate_active_completed(active,completed)
     assert linked.iloc[0]['_sale_duration_seconds']==7200
+    assert linked.iloc[0]['_time_reason']==''
 
 
 @pytest.mark.parametrize('tokens,include_gems',[

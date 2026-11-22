@@ -114,11 +114,15 @@ def add_packet_times(frame):
     remaining=work['_expiry_at']-work['_first_seen']
     period=pd.to_numeric(work.get('listing_days',pd.Series(index=work.index,dtype=float)),errors='coerce')
     period=period.where(period.isin([1,3]))
-    match1=period.eq(1) & remaining.gt(pd.Timedelta(0)) & remaining.le(day)
+    within_day=remaining.gt(pd.Timedelta(0)) & remaining.le(day)
+    assumed=period.isna() & within_day
+    match1=(period.eq(1) & within_day) | assumed
     match3=(period.eq(3) | (period.isna() & remaining.gt(day))) & remaining.gt(pd.Timedelta(0)) & remaining.le(3*day)
     work.loc[match1,'_registered_at']=internal[match1]-day
     work.loc[match3,'_registered_at']=internal[match3]-3*day
     work.loc[work['_registered_at'].notna(),'_time_reason']=''
+    work['_registration_assumed']=assumed
+    work.loc[assumed,'_time_reason']='등록기간 1일로 계산'
     work.loc[work.status.eq('completed') & work['_sale_at'].isna(),'_time_reason']='완료 시각 미확인'
     return work
 
@@ -142,6 +146,7 @@ def deduplicate_active_completed(active,completed):
     active=add_packet_times(collapse_active_observations(active))
     completed=add_packet_times(completed.reset_index(drop=True))
     for col in ('_sale_duration_seconds','_sale_duration_minutes'):completed[col]=pd.Series(pd.NA,index=completed.index,dtype='Int64')
+    completed['_registration_assumed']=False
     completed['_linked_active_at']=pd.NaT
     if active.empty or completed.empty:return active,completed,0
     cols=['itemCode','quantity','total_price','total_upgrade_left','total_work_count']+['total_'+s for s in STATS]+['option_codes']
@@ -160,24 +165,26 @@ def deduplicate_active_completed(active,completed):
     )
     links,competing=unique_links(active_rows,completed_rows)
     registered_times=active['_registered_at'].tolist()
+    assumed_registration=active['_registration_assumed'].tolist()
     active_reasons=active['_time_reason'].tolist()
     first_seen=active['_first_seen'].tolist()
     sale_times=completed['_sale_at'].tolist()
     reasons=completed['_time_reason'].tolist()
     seconds_out=[pd.NA]*len(completed);minutes_out=[pd.NA]*len(completed);linked_out=[pd.NaT]*len(completed)
+    assumed_out=[False]*len(completed)
     for ci in competing:
         reasons[ci]='동일 옵션 매물 연결 불확실'
     for ci,ai in links.items():
         registered=registered_times[ai]
-        if pd.isna(registered):
-            reasons[ci]=active_reasons[ai]
-            continue
+        reasons[ci]=active_reasons[ai]
+        if pd.isna(registered):continue
         seconds=(sale_times[ci]-registered).total_seconds()
         seconds_out[ci]=int(seconds);minutes_out[ci]=int(seconds//60)
-        linked_out[ci]=first_seen[ai];reasons[ci]=''
+        linked_out[ci]=first_seen[ai];assumed_out[ci]=assumed_registration[ai]
     completed['_sale_duration_seconds']=pd.array(seconds_out,dtype='Int64')
     completed['_sale_duration_minutes']=pd.array(minutes_out,dtype='Int64')
     completed['_linked_active_at']=pd.to_datetime(linked_out)
+    completed['_registration_assumed']=assumed_out
     completed['_time_reason']=reasons
     return active.drop(index=list(links.values())).reset_index(drop=True),completed,len(links)
 
@@ -245,7 +252,7 @@ def packet_view(frame,include_gems=False,prices=None,context=''):
         gems=evaluate_gems(row,prices or {},context)
         expiry=pd.to_datetime(row.get('_expiry_at',row.get('internal_time')),errors='coerce')
         completed=row.get('status')=='completed';seconds=row.get('_sale_duration_seconds')
-        fast=completed and pd.notna(seconds) and number(seconds)<=120
+        fast=completed and pd.notna(seconds) and number(seconds)<=120 and not row.get('_registration_assumed',False)
         state='판매완료' if completed else '만료' if pd.notna(expiry) and expiry<=now else '판매중'
         price=number(row.get('unit_price'));cost=gems['recognized_gem_cost']
         body_price=price_in_man(price-cost)

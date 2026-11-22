@@ -115,6 +115,9 @@ def test_time_crosses_midnight_with_both_one_and_three_day_listings():
     assert count==1 and linked.iloc[0]['_sale_duration_seconds']==40
     assert packet_view(linked).iloc[0]['_빠른판매']
     a.loc[0,'internal_time']='2026-11-10 23:59:40'
+    _,linked,count=deduplicate_active_completed(a,c)
+    assert count==1 and linked.iloc[0]['_sale_duration_seconds']==40
+    assert not packet_view(linked).iloc[0]['_빠른판매']
     a.loc[0,'listing_days']=1
     _,linked,_=deduplicate_active_completed(a,c)
     assert linked.iloc[0]['_sale_duration_seconds']==40
