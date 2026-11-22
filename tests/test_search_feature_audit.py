@@ -173,29 +173,30 @@ def test_missing_sale_duration_is_visible_and_has_reason():
     assert '연결할 판매중 자료 없음' in render_table(view)
 
 
-@pytest.mark.parametrize('days',[1,3])
-@pytest.mark.parametrize('capture_offset_seconds',[-3601,-3600,-1800,0,1800,3600,3601])
-def test_listing_period_detection_within_one_hour_both_directions(days,capture_offset_seconds):
+@pytest.mark.parametrize('seconds,confirmed',[(86400,False),(86401,True),(259200,True),(259201,False)])
+def test_registration_requires_more_than_one_day_left(seconds,confirmed):
     from your_app.processing.packet_search import add_packet_times
-    registered=pd.Timestamp('2026-11-10 23:50:00')
-    captured=registered+pd.Timedelta(seconds=capture_offset_seconds)
-    expiry=registered+pd.Timedelta(days=days)
+    expiry=pd.Timestamp('2026-11-13 23:50:00')
+    captured=expiry-pd.Timedelta(seconds=seconds)
     actual=add_packet_times(pd.DataFrame([row(captured_at=str(captured),internal_time=str(expiry))])).iloc[0]
-    if abs(capture_offset_seconds)<=3600:
-        assert actual['_registered_at']==registered
+    if confirmed:
+        assert actual['_registered_at']==expiry-pd.Timedelta(days=3)
         assert actual['_time_reason']==''
     else:
         assert pd.isna(actual['_registered_at'])
 
 
-def test_in_between_period_stays_unknown_and_one_day_sale_uses_packet_times():
+def test_unconfirmed_one_day_listing_stays_unknown():
     from your_app.processing.packet_search import add_packet_times,deduplicate_active_completed
     f=add_packet_times(pd.DataFrame([row(internal_time='2026-11-12 10:00:00')]))
-    assert pd.isna(f.iloc[0]['_registered_at'])
+    assert f.iloc[0]['_registered_at']==pd.Timestamp('2026-11-09 10:00:00')
     active=pd.DataFrame([row(captured_at='2026-11-10 10:30:00',internal_time='2026-11-11 10:00:00')])
     completed=pd.DataFrame([row(status='completed',captured_at='2026-11-10 12:00:10',internal_time='2026-11-10 12:00:00')])
     _,linked,_=deduplicate_active_completed(active,completed)
-    # Two hours from inferred registration, rather than 90 minutes of captures.
+    assert pd.isna(linked.iloc[0]['_sale_duration_seconds'])
+    assert linked.iloc[0]['_time_reason']=='등록기간 미확인'
+    active['listing_days']=1
+    _,linked,_=deduplicate_active_completed(active,completed)
     assert linked.iloc[0]['_sale_duration_seconds']==7200
 
 

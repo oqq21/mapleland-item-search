@@ -1,6 +1,5 @@
 """Parquet search with newitemp bases, strict conditions and conservative time linking."""
 from __future__ import annotations
-import bisect
 from html import escape
 from functools import lru_cache
 from pathlib import Path
@@ -8,6 +7,7 @@ import pandas as pd
 from your_app.common.stat_query import parse_tokens
 from your_app.common.display_format import price_in_man
 from your_app.domain.search_rules import STATS,LABELS,SUFFIXES,GEM_VALUES,decode_gems,number,color_score,color_key,additional_sum,evaluate_gems,predicted_color
+from .market_timing import unique_links
 
 ACTUAL_STATS=list(STATS)
 STAT_LABELS=LABELS
@@ -15,7 +15,7 @@ GEM_OPTION_LABELS={i:(LABELS[s],GEM_VALUES[i]) for i,s in enumerate(SUFFIXES)}
 TOTAL_COMPONENTS={'전사':['STR','DEX','ACC'],'궁수':['STR','DEX'],'도적':['DEX','LUK'],'단도':['STR','DEX','LUK'],'법사':['INT','LUK','MAD'],'신점':['STR','DEX','ACC'],'신민':['STR','DEX','ACC'],'법지':['INT','LUK','MAD'],'법행':['INT','LUK','MAD']}
 SIMPLE_STATS={'힘':'STR','덱':'DEX','럭':'LUK','공':'PAD','명':'ACC','회피':'EVA','이속':'SPEED','점프':'JUMP','물방':'PDD','마방':'MDD','HP':'HP','MP':'MP'}
 BASE_COLUMNS={'STR':'힘','DEX':'덱','INT':'인','LUK':'럭','PAD':'공','MAD':'마','PDD':'물방','MDD':'마방','ACC':'명','EVA':'회피','SPEED':'이속','JUMP':'점프','HP':'HP','MP':'MP'}
-RAW_COLUMNS=['status','captured_at','internal_time','event_time','itemCode','itemName','sheet','quantity','total_price','unit_price','option_codes','total_upgrade_left','total_work_count','listing_days']+['total_'+s for s in STATS]+['gem_'+s for s in STATS]
+RAW_COLUMNS=['status','captured_at','internal_time','event_time','list_no','itemCode','itemName','sheet','quantity','total_price','unit_price','option_codes','total_upgrade_left','total_work_count','listing_days']+['total_'+s for s in STATS]+['gem_'+s for s in STATS]
 
 def _numeric(frame,column):
     if column not in frame:return pd.Series(0,index=frame.index,dtype='int64')
@@ -106,31 +106,41 @@ def add_packet_times(frame):
     work=frame.copy();cap=_kst_naive(work.captured_at)
     internal=_kst_naive(work.get('internal_time',pd.Series('',index=work.index)))
     work['_captured_time']=cap;work['_expiry_at']=internal.where(work.status.eq('active'))
-    wall=internal-internal.dt.normalize();anchor=cap.dt.normalize()+wall
-    anchor=anchor.where(anchor.le(cap),anchor-pd.Timedelta(days=1))
-    near=(cap-anchor).between(pd.Timedelta(0),pd.Timedelta(minutes=10))
-    work['_sale_at']=anchor.where(near & work.status.eq('completed'))
+    work['_sale_at']=internal.where(work.status.eq('completed'))
+    work['_first_seen']=work.get('_first_seen',cap)
     work['_registered_at']=pd.NaT;work['_time_reason']='등록기간 미확인'
     work.loc[work.status.eq('completed'),'_time_reason']='연결할 판매중 자료 없음'
-    # Real-time capture: infer either listing period when its reconstructed
-    # registration is within one hour before or after the capture, inclusive.
-    reg1=internal-pd.Timedelta(days=1);reg3=internal-pd.Timedelta(days=3)
-    active=work.status.eq('active');tolerance=pd.Timedelta(hours=1)
-    match1=active & (cap-reg1).abs().le(tolerance)
-    match3=active & (cap-reg3).abs().le(tolerance)
-    if 'listing_days' in work:
-        period=pd.to_numeric(work.listing_days,errors='coerce')
-        match1 &= period.isna() | period.eq(1)
-        match3 &= period.isna() | period.eq(3)
-    unique=match1 ^ match3
-    work.loc[unique & match1,'_registered_at']=reg1[unique & match1]
-    work.loc[unique & match3,'_registered_at']=reg3[unique & match3]
+    day=pd.Timedelta(days=1)
+    remaining=work['_expiry_at']-work['_first_seen']
+    period=pd.to_numeric(work.get('listing_days',pd.Series(index=work.index,dtype=float)),errors='coerce')
+    period=period.where(period.isin([1,3]))
+    match1=period.eq(1) & remaining.gt(pd.Timedelta(0)) & remaining.le(day)
+    match3=(period.eq(3) | (period.isna() & remaining.gt(day))) & remaining.gt(pd.Timedelta(0)) & remaining.le(3*day)
+    work.loc[match1,'_registered_at']=internal[match1]-day
+    work.loc[match3,'_registered_at']=internal[match3]-3*day
     work.loc[work['_registered_at'].notna(),'_time_reason']=''
     work.loc[work.status.eq('completed') & work['_sale_at'].isna(),'_time_reason']='완료 시각 미확인'
     return work
 
-def deduplicate_active_completed(active,completed,days=3):
-    active=add_packet_times(active.reset_index(drop=True));completed=add_packet_times(completed.reset_index(drop=True))
+def collapse_active_observations(active):
+    work=active.reset_index(drop=True)
+    if work.empty or 'list_no' not in work:
+        return work
+    work['_first_seen']=_kst_naive(work.captured_at)
+    expiry=_kst_naive(work.get('internal_time',pd.Series('',index=work.index)))
+    listing_no=_numeric(work,'list_no')
+    known=listing_no.gt(0) & expiry.notna() & work['_first_seen'].notna()
+    observations=pd.DataFrame({
+        'list_no':listing_no[known], 'expiry':expiry[known], 'seen':work.loc[known,'_first_seen'],
+    }).sort_values('seen',kind='stable')
+    keys=['list_no','expiry']
+    work.loc[observations.index,'_first_seen']=observations.groupby(keys,sort=False).seen.transform('min')
+    repeated=observations.index[observations.duplicated(keys,keep='last')]
+    return work.drop(index=repeated).reset_index(drop=True)
+
+def deduplicate_active_completed(active,completed):
+    active=add_packet_times(collapse_active_observations(active))
+    completed=add_packet_times(completed.reset_index(drop=True))
     for col in ('_sale_duration_seconds','_sale_duration_minutes'):completed[col]=pd.Series(pd.NA,index=completed.index,dtype='Int64')
     completed['_linked_active_at']=pd.NaT
     if active.empty or completed.empty:return active,completed,0
@@ -138,40 +148,38 @@ def deduplicate_active_completed(active,completed,days=3):
     def fingerprints(f):
         norm=pd.DataFrame({c:(f.get(c,pd.Series('',index=f.index)).fillna('').astype(str) if c=='option_codes' else _numeric(f,c)) for c in cols})
         return pd.util.hash_pandas_object(norm,index=False).to_numpy()
-    active['_fp']=fingerprints(active);completed['_fp']=fingerprints(completed)
-    groups={}
-    for r in active[['_fp','_captured_time']].sort_values('_captured_time',na_position='last').itertuples():
-        i,fp,cap=r
-        if pd.notna(cap):groups.setdefault(fp,[]).append((cap,i))
-    removed=set();gap=pd.Timedelta(days=days)
+    active_rows=(
+        (i,fp,seen.value/1e9,expires.value/1e9)
+        for i,(fp,seen,expires) in enumerate(zip(fingerprints(active),active['_first_seen'],active['_expiry_at']))
+        if pd.notna(seen) and pd.notna(expires)
+    )
+    completed_rows=(
+        (i,fp,sold.value/1e9)
+        for i,(fp,sold) in enumerate(zip(fingerprints(completed),completed['_sale_at']))
+        if pd.notna(sold)
+    )
+    links,competing=unique_links(active_rows,completed_rows)
     registered_times=active['_registered_at'].tolist()
     active_reasons=active['_time_reason'].tolist()
-    active_captured=active['_captured_time'].tolist()
+    first_seen=active['_first_seen'].tolist()
+    sale_times=completed['_sale_at'].tolist()
     reasons=completed['_time_reason'].tolist()
     seconds_out=[pd.NA]*len(completed);minutes_out=[pd.NA]*len(completed);linked_out=[pd.NaT]*len(completed)
-    # Scalar pandas writes are expensive with copy-on-write; collect values in
-    # plain lists and assign each typed column once after linking.
-    ordered=completed[['_fp','_captured_time','_sale_at']].sort_values('_captured_time',na_position='last')
-    for ci,fp,cap,sold in ordered.itertuples(name=None):
-        candidates=groups.get(fp,[])
-        if not candidates or pd.isna(cap):continue
-        hi=bisect.bisect_left(candidates,(cap,-1));lo=bisect.bisect_left(candidates,(cap-gap,-1))
-        if hi<=lo:continue
-        ambiguous=hi-lo>1
-        _,ai=candidates.pop(hi-1);removed.add(ai)
+    for ci in competing:
+        reasons[ci]='동일 옵션 매물 연결 불확실'
+    for ci,ai in links.items():
         registered=registered_times[ai]
-        if ambiguous:reasons[ci]='동일 옵션 매물 연결 불확실';continue
-        if pd.isna(registered) or pd.isna(sold):
-            reasons[ci]=active_reasons[ai] if pd.isna(registered) else '완료 시각 미확인';continue
-        seconds=(sold-registered).total_seconds()
-        if seconds<0:reasons[ci]='완료가 등록보다 빠름';continue
+        if pd.isna(registered):
+            reasons[ci]=active_reasons[ai]
+            continue
+        seconds=(sale_times[ci]-registered).total_seconds()
         seconds_out[ci]=int(seconds);minutes_out[ci]=int(seconds//60)
-        linked_out[ci]=active_captured[ai];reasons[ci]=''
+        linked_out[ci]=first_seen[ai];reasons[ci]=''
     completed['_sale_duration_seconds']=pd.array(seconds_out,dtype='Int64')
     completed['_sale_duration_minutes']=pd.array(minutes_out,dtype='Int64')
     completed['_linked_active_at']=pd.to_datetime(linked_out)
     completed['_time_reason']=reasons
-    return active.drop(index=list(removed)).drop(columns='_fp').reset_index(drop=True),completed.drop(columns='_fp').reset_index(drop=True),len(removed)
+    return active.drop(index=list(links.values())).reset_index(drop=True),completed,len(links)
 
 def search_packet_data(active_path,completed_path,item_codes,tokens,include_gems=False,catalog=None):
     parse_tokens(tokens);codes=tuple(item_codes)
@@ -180,7 +188,8 @@ def search_packet_data(active_path,completed_path,item_codes,tokens,include_gems
     active,completed,count=deduplicate_active_completed(active,completed)
     if active.empty and completed.empty:return pd.DataFrame(),count
     combined=pd.concat([f for f in (active,completed) if not f.empty],ignore_index=True)
-    combined['_sort_time']=combined['_linked_active_at'].fillna(combined['_captured_time']) if '_linked_active_at' in combined else combined['_captured_time']
+    event_time=combined['_sale_at'].fillna(combined['_captured_time'])
+    combined['_sort_time']=combined['_linked_active_at'].fillna(event_time) if '_linked_active_at' in combined else event_time
     return combined.sort_values('_sort_time',ascending=False,kind='mergesort').reset_index(drop=True),count
 
 
@@ -215,7 +224,7 @@ item_color_score=color_score
 item_color_key=color_key
 
 def format_packet_time(row):
-    t=pd.to_datetime(row.get('_linked_active_at'),errors='coerce')
+    t=pd.to_datetime(row.get('_sale_at'),errors='coerce')
     if pd.isna(t):t=pd.to_datetime(row.get('captured_at'),errors='coerce')
     if pd.isna(t):return ''
     if t.tzinfo is None:t=t.tz_localize('Asia/Seoul')

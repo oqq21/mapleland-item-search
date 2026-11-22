@@ -115,6 +115,7 @@ def test_time_crosses_midnight_with_both_one_and_three_day_listings():
     assert count==1 and linked.iloc[0]['_sale_duration_seconds']==40
     assert packet_view(linked).iloc[0]['_빠른판매']
     a.loc[0,'internal_time']='2026-11-10 23:59:40'
+    a.loc[0,'listing_days']=1
     _,linked,_=deduplicate_active_completed(a,c)
     assert linked.iloc[0]['_sale_duration_seconds']==40
     assert packet_view(linked).iloc[0]['_빠른판매']
@@ -125,10 +126,23 @@ def test_multiple_identical_active_listings_do_not_produce_fast_sale():
     _,linked,_=deduplicate_active_completed(a,c)
     assert pd.isna(linked.iloc[0]['_sale_duration_seconds'])
 
-def test_capture_delay_over_ten_minutes_is_unknown():
-    a=pd.DataFrame([row()]);c=pd.DataFrame([row(status='completed',captured_at='2026-11-10 10:30:01',internal_time='2026-11-10 10:01:00')])
+def test_next_day_capture_uses_original_sale_time():
+    a=pd.DataFrame([row()]);c=pd.DataFrame([row(status='completed',captured_at='2026-11-11 10:30:01',internal_time='2026-11-10 10:01:00')])
     _,linked,_=deduplicate_active_completed(a,c)
-    assert pd.isna(linked.iloc[0]['_sale_duration_seconds'])
+    assert linked.iloc[0]['_sale_at']==pd.Timestamp('2026-11-10 10:01:00')
+    assert linked.iloc[0]['_sale_duration_seconds']==60
+
+
+def test_same_listing_observations_preserve_registration_evidence():
+    a=pd.DataFrame([
+        row(list_no=123),
+        row(list_no=123,captured_at='2026-11-12 21:00:00'),
+        row(list_no=124,captured_at='2026-11-13 17:30:00',internal_time='2026-11-14 17:00:00'),
+    ])
+    c=pd.DataFrame([row(status='completed',captured_at='2026-11-14 03:00:00',internal_time='2026-11-13 01:00:00')])
+    active,linked,count=deduplicate_active_completed(a,c)
+    assert count==1 and active.list_no.tolist()==[124]
+    assert linked.iloc[0]['_sale_duration_seconds']==63*3600
 
 def test_class_and_cloak_aliases_and_strength_dagger():
     f=pd.DataFrame({'itemCode':[1,2,1102101,1102102,1102104,3,4],'itemName':['a']*7,'sheet':['신발','신발','망토','망토','망토','단검','단검'],'직업':['도적','궁수','','','','도적','도적'],'힘':[0,0,0,0,0,0,2]})
