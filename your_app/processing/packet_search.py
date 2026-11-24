@@ -231,7 +231,8 @@ item_color_score=color_score
 item_color_key=color_key
 
 def format_packet_time(row):
-    t=pd.to_datetime(row.get('_sale_at'),errors='coerce')
+    time_column='_sale_at' if row.get('status')=='completed' else '_registered_at'
+    t=pd.to_datetime(row.get(time_column),errors='coerce')
     if pd.isna(t):t=pd.to_datetime(row.get('captured_at'),errors='coerce')
     if pd.isna(t):return ''
     if t.tzinfo is None:t=t.tz_localize('Asia/Seoul')

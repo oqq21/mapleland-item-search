@@ -5,7 +5,7 @@ from your_app.common.stat_query import parse_token
 from your_app.common.query_utils import mask_for_item_query
 from your_app.common.site_links import search_page_url
 from your_app.domain.search_rules import evaluate_gems, additional_sum, predicted_color, STATS
-from your_app.processing.packet_search import filter_packet_rows,prepare_rows,deduplicate_active_completed,packet_view,search_packet_data
+from your_app.processing.packet_search import add_packet_times,filter_packet_rows,prepare_rows,deduplicate_active_completed,packet_view,search_packet_data
 from your_app.gui.search_table import render_table
 
 def row(**kw):
@@ -134,6 +134,21 @@ def test_next_day_capture_uses_original_sale_time():
     _,linked,_=deduplicate_active_completed(a,c)
     assert linked.iloc[0]['_sale_at']==pd.Timestamp('2026-11-10 10:01:00')
     assert linked.iloc[0]['_sale_duration_seconds']==60
+
+
+def test_time_column_uses_registration_for_active_and_expired_listings():
+    now=pd.Timestamp.now(tz='Asia/Seoul').tz_localize(None)
+    expired=now-pd.Timedelta(hours=2,minutes=30)
+    view=packet_view(add_packet_times(pd.DataFrame([
+        row(captured_at=now-pd.Timedelta(hours=1,minutes=30),
+            internal_time=now+pd.Timedelta(hours=19,minutes=30)),
+        row(captured_at=expired-pd.Timedelta(days=2),internal_time=expired),
+        row(captured_at=now-pd.Timedelta(minutes=30,seconds=30),internal_time=None),
+        row(status='completed',captured_at=now-pd.Timedelta(minutes=30),internal_time=expired),
+    ])))
+    assert list(view[['상태','시간']].itertuples(index=False,name=None))==[
+        ('판매중','4시간전'),('만료','3일전'),('판매중','30분전'),('판매완료','2시간전'),
+    ]
 
 
 def test_same_listing_observations_preserve_registration_evidence():

@@ -22,7 +22,7 @@ from your_app.gui.compact_layout import COMPACT_CSS
 ROOT=Path(__file__).resolve().parent
 CATALOG_PATH=ROOT/'resources/item_catalog.json'
 CATALOG_REVISION=CATALOG_PATH.stat().st_mtime_ns
-APP_BUILD="2026-11-22-search-v20-one-day-listing"
+APP_BUILD="2026-11-24-search-v21-listing-time"
 st.set_page_config(page_title="메랜 아이템검색",layout="wide",initial_sidebar_state="collapsed")
 st.html(COMPACT_CSS)
 st.html('<script>'+(ROOT/'your_app/gui/korean_input.js').read_text(encoding='utf-8')+'</script>',unsafe_allow_javascript=True)
