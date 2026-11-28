@@ -136,7 +136,6 @@ def evaluate_gems(row: Mapping, prices: Mapping, context='') -> dict:
     reverse=str(row.get('itemName','')).replace(' ','').startswith('리버스')
     recognized=[g for g in gems if applicable and (unrestricted or g.stat in required | optional)]
     materials,fee=gem_costs(recognized,prices,reverse=reverse);cost=materials+fee
-    all_materials,all_fee=gem_costs(gems,prices,reverse=reverse)
     price=number(row.get('unit_price'))
     weapon=sheet in WEAPONS
     physical_weapon=weapon and sheet not in {'완드','스태프'} and number(row.get('itemCode'))!=YELLOW_UMBRELLA
@@ -174,7 +173,7 @@ def evaluate_gems(row: Mapping, prices: Mapping, context='') -> dict:
         if g.grade<2 or kind not in {'required','optional'}:token=f'({token})'
         spans.append(f'<span class="gem-token" style="color:{colors[kind]}" title="{grade}">{token}</span>')
     reasons=option_reasons+[ratio_reason] if ratio_reason else option_reasons
-    return {'has_gems':bool(gems),'recognized_gem_cost':cost,'all_gem_cost':all_materials+all_fee,'gem_html':' / '.join(spans),
+    return {'has_gems':bool(gems),'recognized_gem_cost':cost,'gem_html':' / '.join(spans),
             'gem_text':' / '.join(LABELS[g.stat]+'+'+str(g.value) for g in gems),
             'invalid_reasons':' / '.join(reasons),'gem_valid':not reasons,
             'gem_cell_style':cell_style,'gem_ratio_warning':bool(ratio_reason)}

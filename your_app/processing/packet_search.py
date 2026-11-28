@@ -277,7 +277,7 @@ def packet_view(frame,include_gems=False,prices=None,context=''):
         name=str(row.get('itemName',''))
         records.append({'상태':state,'시간':format_packet_time(row),'판매소요':format_sale_duration(row),'아이템':name,
             '총스탯':stats,'_총스탯HTML':stats_html,
-            '판매가(만)':price_in_man(price),'보석제외가(만)':body_price,'보석':gems['gem_text'],'보석가(만)':price_in_man(gems['all_gem_cost']),
+            '판매가(만)':price_in_man(price),'보석제외가(만)':body_price,'보석':gems['gem_text'],'보석가(만)':price_in_man(cost),
             '_보석가격경고':gems['gem_ratio_warning'],'_차액경고':gems['has_gems'] and body_price<=0,
             '무효 사유':gems['invalid_reasons'],
             '_아이템색':color_key(color_score(row)),'_예상색':predicted_color(row),'_보석HTML':gems['gem_html'],'_보석셀':gems['gem_cell_style'],'_빠른판매':fast,'_시간설명':str(row.get('_time_reason','')),'_code':number(row.get('itemCode'))})

@@ -73,10 +73,10 @@ def test_optional_grade_and_useless_gem_do_not_invalidate_valid_armor():
     assert useless['gem_valid'] and useless['recognized_gem_cost']==6_750_000
 
 
-def test_all_gems_appear_in_cost_but_only_recognized_gems_are_subtracted():
+def test_only_recognized_gems_count_in_displayed_cost_and_deduction():
     prices={'26008':2_000_000,'26011':1_000_000,'26010':10_000_000}
     view=packet_view(pd.DataFrame([row(option_codes='26008,26011,26010',unit_price=1_000_000)]),prices=prices)
-    assert view.iloc[0]['보석가(만)']==2200
+    assert view.iloc[0]['보석가(만)']==975
     assert view.iloc[0]['보석제외가(만)']==-875
     html=render_table(view)
     assert 'gem-cell gem-white' in html
